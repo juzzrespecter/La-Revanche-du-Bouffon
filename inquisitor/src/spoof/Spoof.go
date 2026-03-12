@@ -1,3 +1,5 @@
+package spoof
+
 import (
 	"bytes"
 )

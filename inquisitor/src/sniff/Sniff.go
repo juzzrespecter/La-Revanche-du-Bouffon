@@ -1,0 +1,5 @@
+package sniff
+
+func Sniff() {
+
+}
