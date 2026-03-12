@@ -1,0 +1,36 @@
+services:
+  host:
+    build:
+      context: ./env/host
+      dockerfile: Dockerfile.host
+      args:
+        - USER: host
+        - USER_PWD: host_pwd
+      networks:
+        - inquisitor
+
+  ftp-server:
+    build:
+      context: ./env
+      dockerfile: Dockerfile.srv
+    container_name: ftp_server
+    environment:
+      - PUID: 1000
+      - PGID: 1000
+      - TZ: Etc/UTC
+    volumes:
+      - ./env/ftpd/:/config
+    networks:
+      - inquisitor
+
+  mitm:
+    image: golang:1.26-trixie
+    volumes:
+      - .:/opt/inquisitor
+    cap_add:
+      - NET_RAW
+    networks:
+      - inquisitor
+
+networks:
+  inquisitor:
