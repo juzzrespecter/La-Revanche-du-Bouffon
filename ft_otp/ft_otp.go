@@ -45,5 +45,13 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+		fmt.Println("Key saved succesfully in ft_otp.key")
+	}
+	if keyArgs.keyFile != "" {
+		err, key := encrypt.DecryptKey()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 }

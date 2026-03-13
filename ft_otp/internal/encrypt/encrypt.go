@@ -1,7 +1,6 @@
 package encrypt
 
 import (
-	"bufio"
 	"crypto/aes"
 	"encoding/hex"
 	"fmt"
@@ -9,13 +8,16 @@ import (
 	"os"
 )
 
-func encryptKey(key string, passwd []byte) ([]byte, error) {
+func encryptKey(key, passwd []byte) ([]byte, error) {
 	c, err := aes.NewCipher(passwd)
 	if err != nil {
 		return nil, err
 	}
 	padding := aes.BlockSize - len(key)%aes.BlockSize
-	bytesKey = make([]byte, len(key)+padding)
+	cypher := make([]byte, len(key)+padding)
+	cypher = append(cypher, make([]byte, padding)...)
+	c.Encrypt()
+
 }
 
 func decryptKey(cypher, passwd []byte) (string, error) {
@@ -26,6 +28,7 @@ func EncryptKey(key string) error {
 	const (
 		keyFile = "ft_otp.key"
 	)
+
 	if len(key) < 64 {
 		return utils.ErrKeyLength
 	}
@@ -38,13 +41,11 @@ func EncryptKey(key string) error {
 		return fmt.Errorf("Encrypt Key: %w", err)
 	}
 	defer fd.Close()
-	rd := bufio.NewReader(os.Stdin)
-	fmt.Println("Introduce encryption key:")
-	passwd, err := rd.ReadBytes(byte('\n'))
+	passwd, err := utils.ReadInput()
 	if err != nil {
 		return fmt.Errorf("Encrypt Key: %w", err)
 	}
-	encryptedKey, err := encryptKey(key, passwd)
+	encryptedKey, err := encryptKey([]byte(key), passwd)
 	if err != nil {
 		return fmt.Errorf("Encrypt Key: %w", err)
 	}
@@ -54,6 +55,15 @@ func EncryptKey(key string) error {
 	return nil
 }
 
-func DecryptKey() {
-
+// Bla bla bla test
+func DecryptKey(key string) ([]byte, error) {
+	encKey, err := os.ReadFile(key)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	passwd, err := utils.ReadInput()
+	if err != nil {
+		return nil, fmt.Errorf("Decrypt Key: %w", err)
+	}
 }

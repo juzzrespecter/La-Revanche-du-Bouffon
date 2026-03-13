@@ -1,0 +1,5 @@
+package HOTP
+
+func HOTP() {
+
+}
