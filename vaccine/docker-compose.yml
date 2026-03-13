@@ -1,0 +1,9 @@
+services:
+# original, testing
+  sqlmap:
+
+# vuln server
+  server:
+
+# el nuestro
+  host:

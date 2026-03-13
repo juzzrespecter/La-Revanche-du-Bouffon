@@ -1,0 +1,4 @@
+FROM python:3.14-alpine
+
+RUN apk add git --no-cache
+RUN git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap
