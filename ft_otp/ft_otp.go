@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"ft_otp/internal/encrypt"
 	"ft_otp/internal/utils"
+	totp "ft_otp/pkg"
 	"os"
 )
 
@@ -48,10 +49,11 @@ func main() {
 		fmt.Println("Key saved succesfully in ft_otp.key")
 	}
 	if keyArgs.keyFile != "" {
-		err, key := encrypt.DecryptKey()
+		key, err := encrypt.DecryptKey(keyArgs.keyFile)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+		totp.TOTP(key)
 	}
 }

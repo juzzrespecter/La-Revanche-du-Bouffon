@@ -2,28 +2,56 @@ package encrypt
 
 import (
 	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"ft_otp/internal/utils"
 	"os"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-func encryptKey(key, passwd []byte) ([]byte, error) {
-	c, err := aes.NewCipher(passwd)
+func encryptKey(plaintext, key []byte) ([]byte, error) {
+	padding := aes.BlockSize - len(plaintext)%aes.BlockSize
+	ciphertext := make([]byte, len(plaintext)+padding)
+	ciphertext = append(ciphertext, make([]byte, aes.BlockSize)...)
+
+	iv := ciphertext[:aes.BlockSize]
+	rand.Read(iv)
+
+	hash, err := bcrypt.GenerateFromPassword(key, bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
-	padding := aes.BlockSize - len(key)%aes.BlockSize
-	cypher := make([]byte, len(key)+padding)
-	cypher = append(cypher, make([]byte, padding)...)
-	c.Encrypt()
+	fmt.Printf("Length of hash: %d\n", len(hash))
+	b, err := aes.NewCipher(hash[:32])
+	if err != nil {
+		return nil, err
+	}
 
+	m := cipher.NewCBCEncrypter(b, iv)
+	m.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	return ciphertext, nil
 }
 
-func decryptKey(cypher, passwd []byte) (string, error) {
-
+func decryptKey(ciphertext, key []byte) ([]byte, error) {
+	hash, err := bcrypt.GenerateFromPassword(key, bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	b, err := aes.NewCipher(hash[:32])
+	if err != nil {
+		return nil, err
+	}
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+	m := cipher.NewCBCDecrypter(b, iv)
+	m.CryptBlocks(ciphertext, ciphertext)
+	return ciphertext, nil
 }
 
+// AES CBC
 func EncryptKey(key string) error {
 	const (
 		keyFile = "ft_otp.key"
@@ -50,12 +78,11 @@ func EncryptKey(key string) error {
 		return fmt.Errorf("Encrypt Key: %w", err)
 	}
 	if n, err := fd.Write(encryptedKey); err != nil || n != len(encryptedKey) {
-
+		return fmt.Errorf("Encrypt Key: %w", err)
 	}
 	return nil
 }
 
-// Bla bla bla test
 func DecryptKey(key string) ([]byte, error) {
 	encKey, err := os.ReadFile(key)
 	if err != nil {
@@ -66,4 +93,9 @@ func DecryptKey(key string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Decrypt Key: %w", err)
 	}
+	plaintext, err := decryptKey(encKey, passwd)
+	if err != nil {
+		return nil, fmt.Errorf("Decrypt key: %w", err)
+	}
+	return plaintext, nil
 }
