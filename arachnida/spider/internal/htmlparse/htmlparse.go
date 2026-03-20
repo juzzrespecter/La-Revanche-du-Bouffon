@@ -1,17 +1,15 @@
 package htmlparse
 
 import (
-	"fmt"
 	"io"
 
 	"golang.org/x/net/html"
 )
 
-func ParseHtml(htmlBody io.ReadCloser) {
+func ParseHtml(htmlBody io.ReadCloser) ([]string, []string, error) {
 	doc, err := html.Parse(htmlBody)
 	if err != nil {
-		fmt.Println("error: ", err)
-		return
+		return nil, nil, err
 	}
 
 	var href []string
@@ -33,27 +31,10 @@ func ParseHtml(htmlBody io.ReadCloser) {
 				}
 			}
 		}
-		for n := node.FirstChild; n != nil; n.NextSibling {
+		for n := node.FirstChild; n != nil; n = n.NextSibling {
 			crawlDom(n)
 		}
 	}
 	crawlDom(doc)
+	return href, src, nil
 }
-
-/*
- var body *html.Node
-    var crawler func(*html.Node)
-    crawler = func(node *html.Node) {
-        if node.Type == html.ElementNode && node.Data == "body" {
-            body = node
-            return
-        }
-        for child := node.FirstChild; child != nil; child = child.NextSibling {
-            crawler(child)
-        }
-    }
-    crawler(doc)
-    if body != nil {
-        return body, nil
-    }
-    return nil, errors.New("Missing <body> in the node tree") */

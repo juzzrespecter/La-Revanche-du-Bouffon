@@ -2,24 +2,24 @@ package crawler
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"spider/internal/htmlparse"
 	"sync"
 )
 
-func Crawl(url url.URL) {
-	var req http.Client
+func Crawl(url url.URL) error {
+	var c http.Client
 	ch := make(chan int, 500)
 	var wg sync.WaitGroup
 	for i := range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			fmt.Printf("Called goroutine %d\n", i)
+		wg.Go(func() {
+			res, err := c.Get(url.String())
+			if err != nil {
+				fmt.Println(err)
+			}
 			ch <- i
-		}()
+		})
 	}
 	go func() {
 		wg.Wait()
@@ -41,6 +41,10 @@ func Crawl(url url.URL) {
 	}
 	fmt.Println(res.StatusCode)
 	defer res.Body.Close()
-	html, err := io.ReadAll(res.Body)
-	htmlparse.ParseHtml(res.Body)
+	src, href, err := htmlparse.ParseHtml(res.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Println(src, href)
+	return nil
 }
