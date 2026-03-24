@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/url"
@@ -71,8 +72,15 @@ func checkDirectory(storage string) error {
 
 func main() {
 	if err := checkDirectory(p); err != nil {
-		logger.Error(fmt.Sprintf("%s"))
+		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	crawler.Crawl(*URL, crawler.Config{r, uint(l), p})
+	ctx := context.Background()
+	cfg := &crawler.Config{
+		Ctx:         &ctx,
+		IsRecursive: r,
+		Depth:       uint(l),
+		StoreDir:    p,
+	}
+	crawler.Crawl(*URL, cfg)
 }

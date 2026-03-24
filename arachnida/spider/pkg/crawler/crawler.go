@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -15,10 +14,12 @@ import (
 	log "spider/internal/logger"
 	"spider/internal/utils"
 	"sync"
+	"time"
 	//borrame
 )
 
 type Config struct {
+	Ctx         *context.Context
 	IsRecursive bool
 	Depth       uint
 	StoreDir    string
@@ -28,15 +29,14 @@ func (c Config) Unpack() (bool, uint, string) {
 	return c.IsRecursive, c.Depth, c.StoreDir
 }
 
-func fetchImages(src []string, storage string, c *http.Client) {
+func fetchImages(src []string, storage string, c *client.CustomClient) {
 	e := make(chan error)
 
 	var wg sync.WaitGroup
 
 	for _, url := range src {
 		wg.Go(func() {
-			req, err := utils.GenerateRequest(url)
-			res, err := c.Do(req)
+			res, err := c.Get(url)
 			if err != nil {
 				e <- err
 				return
@@ -61,7 +61,7 @@ func fetchImages(src []string, storage string, c *http.Client) {
 func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 	r := make(chan hp.ParseResult, len(urls))
 	e := make(chan error)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(*c.Ctx)
 	hrefs := make([]string, 0)
 	srcs := make([]string, 0)
 
@@ -81,7 +81,7 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 			logger.Info(fmt.Sprintf("Request to %s %d", u, res.StatusCode))
 			refs, err := hp.ParseHtml(res.Body)
 			if err != nil {
-				e <- fmt.Errorf("Invalid body")
+				e <- fmt.Errorf("%s: %w", u, err)
 				return
 			}
 			for i, ref := range refs.Href {
@@ -117,8 +117,11 @@ WaitRoutines:
 	return hrefs, srcs
 }
 
-func Crawl(url url.URL, cfg Config) error {
-	c := client.NewClient()
+func Crawl(url url.URL, cfg *Config) error {
+	c := client.NewClient(
+		15*time.Second,
+		*cfg.Ctx,
+	)
 
 	isRecursive, depth, storage := cfg.Unpack()
 	urls := []string{url.String()}
@@ -134,10 +137,5 @@ func Crawl(url url.URL, cfg Config) error {
 	recursiveCrawl(urls, 1)
 
 	// limitar concurrencias
-	// gestion de timeout
-	// gestion de retries
-	// gestion de redirecciones ??
-	// gestion de valores de respuesta
-	// gestion de urls ya visitadas
 	return nil
 }

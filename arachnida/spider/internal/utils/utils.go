@@ -78,8 +78,6 @@ func SetUpURL(origin *url.URL, href string) string {
 	valid, err := url.ParseRequestURI(href)
 	if err != nil || valid.Host == "" || valid.Scheme == "" {
 		href = origin.Scheme + "://" + origin.Host + href
-		return href
-
 	}
 	return href
 }

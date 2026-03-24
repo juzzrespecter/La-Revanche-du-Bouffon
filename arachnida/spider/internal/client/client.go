@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"slices"
 	"spider/internal/logger"
@@ -16,9 +17,11 @@ type CustomClient struct {
 	visitedUrls map[string]bool
 	m           sync.RWMutex
 	maxRetries  int
+
+	Ctx *context.Context
 }
 
-const retriableCodes = []int{
+var retriableCodes = []int{
 	http.StatusRequestTimeout,
 	http.StatusTooEarly,
 	http.StatusTooManyRequests,
@@ -28,14 +31,22 @@ const retriableCodes = []int{
 	http.StatusGatewayTimeout,
 }
 
-func backoff(retryAttempt int) {
+func backoff(retryAttempt int) time.Duration {
+	base := 500 * time.Millisecond
+	max := 5 * time.Second
 
+	x := time.Duration(1<<retryAttempt) * base
+	if x > max {
+		x = max
+	}
+	y := int64(x / 2)
+	return time.Duration(rand.Int63n(int64(x)-y) + y)
 }
 
-func NewClient(ctx context.Context) *CustomClient {
+func NewClient(timeout time.Duration, ctx context.Context) *CustomClient {
 	return &CustomClient{
 		client: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: timeout,
 		},
 		visitedUrls: make(map[string]bool),
 		maxRetries:  3,
@@ -75,7 +86,9 @@ func (c *CustomClient) Get(url string) (*http.Response, error) {
 		logger.Debug(fmt.Sprintf("%s: already visited\n", url))
 		return nil, nil
 	}
-	req, err := http.NewRequest("GET", url, nil)
+	ctx, cancel := context.WithTimeout(*c.Ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +100,12 @@ func (c *CustomClient) Get(url string) (*http.Response, error) {
 		case err != nil:
 			return nil, err
 		case slices.Contains(retriableCodes, res.StatusCode):
+			retryTime := backoff(retry)
 			select {
-			case <-time.After(time.Second):
-			case <-c.ctx.Done():
-				return nil, c.ctx.Err()
+			case <-time.After(retryTime):
+				logger.Warning(fmt.Sprintf("Retrying for %s (attempt %d)...\n", url, retry))
+			case <-ctx.Done():
+				return nil, ctx.Err()
 			}
 		case res.StatusCode == http.StatusOK:
 			return res, nil
@@ -98,24 +113,5 @@ func (c *CustomClient) Get(url string) (*http.Response, error) {
 			return nil, fmt.Errorf("Request to %s %d", url, res.StatusCode)
 		}
 	}
+	return nil, fmt.Errorf("%s: max number of retries exceeded", url)
 }
-
-/*
-
-
-req, err := utils.GenerateRequest(u)
-			if err != nil {
-				e <- err
-				return
-			}
-			res, err := c.Do(req)
-			// manejar 429 y hacerlo generico para pillar srcs
-			switch {
-			case err != nil:
-				e <- err
-				return
-			case res.StatusCode > http.StatusBadRequest:
-				e <- fmt.Errorf("Request to %s %d", u, res.StatusCode)
-				return
-			}
-*/
