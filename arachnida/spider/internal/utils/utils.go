@@ -2,6 +2,7 @@ package utils
 
 import (
 	"math/rand/v2"
+	"net/url"
 )
 
 var userAgentList = []string{
@@ -71,4 +72,14 @@ var userAgentList = []string{
 func GetUserAgent() string {
 	idx := rand.IntN(60) % 60
 	return userAgentList[idx]
+}
+
+func SetUpURL(origin *url.URL, href string) string {
+	valid, err := url.ParseRequestURI(href)
+	if err != nil || valid.Host == "" || valid.Scheme == "" {
+		href = origin.Scheme + "://" + origin.Host + href
+		return href
+
+	}
+	return href
 }

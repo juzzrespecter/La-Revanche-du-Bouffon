@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"spider/internal/logger"
 	"spider/pkg/crawler"
 )
 
@@ -36,6 +37,11 @@ func init() {
 		fmt.Fprintln(os.Stderr, "error: -l requires -r")
 		os.Exit(1)
 	}
+	if lSet && l < 1 {
+		fmt.Fprintln(os.Stderr, "error: depth level must be greater than zero")
+		flag.Usage()
+		os.Exit(1)
+	}
 	if flag.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "error: an URL must be provided")
 		flag.Usage()
@@ -50,6 +56,23 @@ func init() {
 	URL = url
 }
 
+func checkDirectory(storage string) error {
+	f, err := os.Stat(storage)
+	if err != nil {
+		return err
+	}
+	switch mode := f.Mode(); {
+	case mode.IsDir():
+		return nil
+	default:
+		return fmt.Errorf("%s: not a directory", storage)
+	}
+}
+
 func main() {
-	crawler.Crawl(*URL)
+	if err := checkDirectory(p); err != nil {
+		logger.Error(fmt.Sprintf("%s"))
+		os.Exit(1)
+	}
+	crawler.Crawl(*URL, crawler.Config{r, uint(l), p})
 }

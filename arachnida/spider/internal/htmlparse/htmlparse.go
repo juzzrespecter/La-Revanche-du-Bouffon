@@ -2,14 +2,29 @@ package htmlparse
 
 import (
 	"io"
+	"path/filepath"
+	"slices"
+	"spider/internal/logger"
 
 	"golang.org/x/net/html"
 )
 
-func ParseHtml(htmlBody io.ReadCloser) ([]string, []string, error) {
+type ParseResult struct {
+	Href []string
+	Src  []string
+}
+
+func (r ParseResult) Unpack() ([]string, []string) {
+	return r.Href, r.Src
+}
+
+var parseNil ParseResult = ParseResult{nil, nil}
+
+func ParseHtml(htmlBody io.ReadCloser) (ParseResult, error) {
+	validTypes := []string{"jpg", "jpeg", "png", "bmp"}
 	doc, err := html.Parse(htmlBody)
 	if err != nil {
-		return nil, nil, err
+		return parseNil, err
 	}
 
 	var href []string
@@ -20,7 +35,10 @@ func ParseHtml(htmlBody io.ReadCloser) ([]string, []string, error) {
 		if node.Type == html.ElementNode && node.Data == "img" {
 			for _, attr := range node.Attr {
 				if attr.Key == "src" {
-					src = append(src, attr.Val)
+					ext := filepath.Ext(attr.Val)
+					if slices.Contains(validTypes, ext) {
+						src = append(src, attr.Val)
+					}
 				}
 			}
 		}
@@ -36,5 +54,6 @@ func ParseHtml(htmlBody io.ReadCloser) ([]string, []string, error) {
 		}
 	}
 	crawlDom(doc)
-	return href, src, nil
+	logger.Info("Finished parsing html")
+	return ParseResult{href, src}, nil
 }

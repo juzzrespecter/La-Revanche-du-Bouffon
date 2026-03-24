@@ -1,11 +1,19 @@
 package scorpion
 
 import (
-	"flag"
 	"fmt"
+	"os"
 )
 
+func Usage() {
+
+}
+
 func main() {
-	flag.Parse()
-	fmt.Println("Hola")
+	if len(os.Args[1:]) < 1 {
+		fmt.Fprintln(os.Stderr, "")
+		Usage()
+		os.Exit(1)
+	}
+	// gorutinas y un mutex pa imprimir
 }

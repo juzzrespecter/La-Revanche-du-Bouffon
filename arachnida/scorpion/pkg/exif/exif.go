@@ -1,0 +1,5 @@
+package exif
+
+func Exif() {
+
+}
