@@ -17,8 +17,11 @@ type CustomClient struct {
 	visitedUrls map[string]bool
 	m           sync.RWMutex
 	maxRetries  int
+	reqSem      chan struct{}
 
-	Ctx *context.Context
+	Ctx                   *context.Context
+	Timeout               time.Duration
+	MaxConcurrentRequests uint
 }
 
 var retriableCodes = []int{
@@ -33,7 +36,7 @@ var retriableCodes = []int{
 
 func backoff(retryAttempt int) time.Duration {
 	base := 500 * time.Millisecond
-	max := 5 * time.Second
+	max := 10 * time.Second
 
 	x := time.Duration(1<<retryAttempt) * base
 	if x > max {
@@ -43,17 +46,23 @@ func backoff(retryAttempt int) time.Duration {
 	return time.Duration(rand.Int63n(int64(x)-y) + y)
 }
 
-func NewClient(timeout time.Duration, ctx context.Context) *CustomClient {
+func NewClient(
+	ctx context.Context,
+	timeout time.Duration,
+	maxConcurrentRequests uint) *CustomClient {
 	return &CustomClient{
 		client: &http.Client{
 			Timeout: timeout,
 		},
-		visitedUrls: make(map[string]bool),
-		maxRetries:  3,
+		visitedUrls:           make(map[string]bool),
+		maxRetries:            3,
+		Timeout:               timeout,
+		MaxConcurrentRequests: maxConcurrentRequests,
+		reqSem:                make(chan struct{}, maxConcurrentRequests),
 	}
 }
 
-func (c *CustomClient) alreadyVisited(url string) bool {
+func (c *CustomClient) AlreadyVisited(url string) bool {
 	c.m.RLock()
 	status := c.visitedUrls[url]
 	if status == false {
@@ -82,11 +91,7 @@ Exponential Backoffs y retries:
 	sleep = jitter(min(cap, base × factor^attempt))
 */
 func (c *CustomClient) Get(url string) (*http.Response, error) {
-	if c.alreadyVisited(url) {
-		logger.Debug(fmt.Sprintf("%s: already visited\n", url))
-		return nil, nil
-	}
-	ctx, cancel := context.WithTimeout(*c.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(*c.Ctx, c.Timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -95,22 +100,28 @@ func (c *CustomClient) Get(url string) (*http.Response, error) {
 	req.Header.Set("User-Agent", utils.GetUserAgent())
 	for retry := 1; retry < c.maxRetries; retry++ {
 		req := req.Clone(req.Context())
-		res, err := c.client.Do(req)
-		switch {
-		case err != nil:
-			return nil, err
-		case slices.Contains(retriableCodes, res.StatusCode):
-			retryTime := backoff(retry)
-			select {
-			case <-time.After(retryTime):
-				logger.Warning(fmt.Sprintf("Retrying for %s (attempt %d)...\n", url, retry))
-			case <-ctx.Done():
-				return nil, ctx.Err()
+		select {
+		case c.reqSem <- struct{}{}:
+			res, err := c.client.Do(req)
+			<-c.reqSem
+			switch {
+			case err != nil:
+				return nil, err
+			case slices.Contains(retriableCodes, res.StatusCode):
+				retryTime := backoff(retry)
+				select {
+				case <-time.After(retryTime):
+					logger.Warning(fmt.Sprintf("Retrying for %s (attempt %d)...\n", url, retry))
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			case res.StatusCode == http.StatusOK:
+				return res, nil
+			default:
+				return nil, fmt.Errorf("Request to %s %d", url, res.StatusCode)
 			}
-		case res.StatusCode == http.StatusOK:
-			return res, nil
 		default:
-			return nil, fmt.Errorf("Request to %s %d", url, res.StatusCode)
+			<-c.reqSem
 		}
 	}
 	return nil, fmt.Errorf("%s: max number of retries exceeded", url)

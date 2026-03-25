@@ -1,8 +1,13 @@
 package utils
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 )
 
 var userAgentList = []string{
@@ -80,4 +85,23 @@ func SetUpURL(origin *url.URL, href string) string {
 		href = origin.Scheme + "://" + origin.Host + href
 	}
 	return href
+}
+
+func GenerateFileName(dir, u string) string {
+	parsedUrl, _ := url.Parse(u)
+	filePath := dir + path.Base(parsedUrl.Path)
+	for i := range 1000 {
+		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+			ext := filepath.Ext(filePath)
+			filePath = fmt.Sprintf(
+				"%s(%d)%s",
+				strings.TrimSuffix(filePath, ext),
+				i,
+				ext,
+			)
+		} else {
+			break
+		}
+	}
+	return filePath
 }

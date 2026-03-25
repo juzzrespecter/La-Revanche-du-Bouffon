@@ -8,6 +8,7 @@ import (
 	"os"
 	"spider/internal/logger"
 	"spider/pkg/crawler"
+	"time"
 )
 
 var (
@@ -81,6 +82,9 @@ func main() {
 		IsRecursive: r,
 		Depth:       uint(l),
 		StoreDir:    p,
+
+		Timeout:               15 * time.Second,
+		MaxConcurrentRequests: 15,
 	}
 	crawler.Crawl(*URL, cfg)
 }

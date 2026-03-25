@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"spider/internal/client"
 	hp "spider/internal/htmlparse"
@@ -15,14 +14,15 @@ import (
 	"spider/internal/utils"
 	"sync"
 	"time"
-	//borrame
 )
 
 type Config struct {
-	Ctx         *context.Context
-	IsRecursive bool
-	Depth       uint
-	StoreDir    string
+	Ctx                   *context.Context
+	IsRecursive           bool
+	Depth                 uint
+	StoreDir              string
+	Timeout               time.Duration
+	MaxConcurrentRequests uint
 }
 
 func (c Config) Unpack() (bool, uint, string) {
@@ -42,7 +42,7 @@ func fetchImages(src []string, storage string, c *client.CustomClient) {
 				return
 			}
 			defer res.Body.Close()
-			filePath := storage + path.Base(url)
+			filePath := utils.GenerateFileName(storage, url)
 			f, err := os.Create(filePath)
 			if err != nil {
 				e <- err
@@ -58,6 +58,10 @@ func fetchImages(src []string, storage string, c *client.CustomClient) {
 	}
 }
 
+func discardUrl(origin, href string) bool {
+
+}
+
 func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 	r := make(chan hp.ParseResult, len(urls))
 	e := make(chan error)
@@ -71,6 +75,10 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 			urlData, err := url.Parse(u)
 			if err != nil {
 				e <- err
+				return
+			}
+			if c.AlreadyVisited(u) {
+				logger.Debug(fmt.Sprintf("%s: already visited\n", u))
 				return
 			}
 			res, err := c.Get(u)
@@ -119,8 +127,9 @@ WaitRoutines:
 
 func Crawl(url url.URL, cfg *Config) error {
 	c := client.NewClient(
-		15*time.Second,
 		*cfg.Ctx,
+		cfg.Timeout,
+		cfg.MaxConcurrentRequests,
 	)
 
 	isRecursive, depth, storage := cfg.Unpack()
@@ -136,6 +145,6 @@ func Crawl(url url.URL, cfg *Config) error {
 	}
 	recursiveCrawl(urls, 1)
 
-	// limitar concurrencias
+	// descartar urls fuera de origen
 	return nil
 }
