@@ -17,7 +17,7 @@ import (
 )
 
 type Config struct {
-	Ctx                   *context.Context
+	Ctx                   context.Context
 	IsRecursive           bool
 	Depth                 uint
 	StoreDir              string
@@ -58,14 +58,10 @@ func fetchImages(src []string, storage string, c *client.CustomClient) {
 	}
 }
 
-func discardUrl(origin, href string) bool {
-
-}
-
 func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 	r := make(chan hp.ParseResult, len(urls))
 	e := make(chan error)
-	ctx, cancel := context.WithCancel(*c.Ctx)
+	ctx, cancel := context.WithCancel(c.Ctx)
 	hrefs := make([]string, 0)
 	srcs := make([]string, 0)
 
@@ -78,7 +74,7 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 				return
 			}
 			if c.AlreadyVisited(u) {
-				logger.Debug(fmt.Sprintf("%s: already visited\n", u))
+				log.Debug(fmt.Sprintf("%s: already visited\n", u))
 				return
 			}
 			res, err := c.Get(u)
@@ -86,12 +82,13 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 				e <- err
 				return
 			}
-			logger.Info(fmt.Sprintf("Request to %s %d", u, res.StatusCode))
-			refs, err := hp.ParseHtml(res.Body)
+			log.Info(fmt.Sprintf("Request to %s %d", u, res.StatusCode))
+			refs, err := hp.ParseHtml(res.Body, c.HostBound)
 			if err != nil {
 				e <- fmt.Errorf("%s: %w", u, err)
 				return
 			}
+
 			for i, ref := range refs.Href {
 				refs.Href[i] = utils.SetUpURL(urlData, ref)
 			}
@@ -102,6 +99,7 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 		wg.Wait()
 		close(r)
 		close(e)
+		fmt.Println("Cancelling")
 		cancel()
 	}()
 
@@ -127,11 +125,11 @@ WaitRoutines:
 
 func Crawl(url url.URL, cfg *Config) error {
 	c := client.NewClient(
-		*cfg.Ctx,
+		cfg.Ctx,
+		url.Hostname(),
 		cfg.Timeout,
 		cfg.MaxConcurrentRequests,
 	)
-
 	isRecursive, depth, storage := cfg.Unpack()
 	urls := []string{url.String()}
 	var recursiveCrawl func([]string, uint)
@@ -144,7 +142,5 @@ func Crawl(url url.URL, cfg *Config) error {
 		}
 	}
 	recursiveCrawl(urls, 1)
-
-	// descartar urls fuera de origen
 	return nil
 }

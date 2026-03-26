@@ -78,7 +78,7 @@ func main() {
 	}
 	ctx := context.Background()
 	cfg := &crawler.Config{
-		Ctx:         &ctx,
+		Ctx:         ctx,
 		IsRecursive: r,
 		Depth:       uint(l),
 		StoreDir:    p,

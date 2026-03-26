@@ -8,12 +8,14 @@ import (
 // valid ext
 
 func Usage() {
-	fmt.Fprintln()
+	fmt.Fprintln(os.Stderr, "usage: "+
+		""+
+		"./scorpion FILE [...FILE]")
 }
 
 func main() {
 	if len(os.Args[1:]) < 1 {
-		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Not enough arguments")
 		Usage()
 		os.Exit(1)
 	}

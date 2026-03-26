@@ -2,6 +2,7 @@ package htmlparse
 
 import (
 	"io"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"spider/internal/logger"
@@ -14,16 +15,36 @@ type ParseResult struct {
 	Src  []string
 }
 
+var validTypes = []string{"jpg", "jpeg", "png", "bmp"}
+
 func (r ParseResult) Unpack() ([]string, []string) {
 	return r.Href, r.Src
 }
 
 var parseNil ParseResult = ParseResult{nil, nil}
 
-func ParseHtml(htmlBody io.ReadCloser) (ParseResult, error) {
-	validTypes := []string{"jpg", "jpeg", "png", "bmp"}
+func validateUrl(u, host string) bool {
+	urlData, err := url.Parse(u)
+	ext := filepath.Ext(u)
+	switch {
+	case err != nil:
+		logger.Debug(u + ": not an URL")
+		return false
+	case urlData.Host != "" && urlData.Hostname() != host:
+		logger.Debug(u + ": out of bounds")
+		return false
+	case slices.Contains(validTypes, ext):
+		logger.Debug(u + ": won't do")
+		return false
+	default:
+		return true
+	}
+}
+
+func ParseHtml(htmlBody io.ReadCloser, host string) (ParseResult, error) {
 	doc, err := html.Parse(htmlBody)
 	if err != nil {
+		logger.Error(err.Error())
 		return parseNil, err
 	}
 
@@ -34,17 +55,14 @@ func ParseHtml(htmlBody io.ReadCloser) (ParseResult, error) {
 	crawlDom = func(node *html.Node) {
 		if node.Type == html.ElementNode && node.Data == "img" {
 			for _, attr := range node.Attr {
-				if attr.Key == "src" {
-					ext := filepath.Ext(attr.Val)
-					if slices.Contains(validTypes, ext) {
-						src = append(src, attr.Val)
-					}
+				if attr.Key == "src" && validateUrl(attr.Val, host) {
+					src = append(src, attr.Val)
 				}
 			}
 		}
 		if node.Type == html.ElementNode && node.Data == "a" {
 			for _, attr := range node.Attr {
-				if attr.Key == "href" {
+				if attr.Key == "href" && validateUrl(attr.Val, host) {
 					href = append(href, attr.Val)
 				}
 			}
@@ -54,6 +72,5 @@ func ParseHtml(htmlBody io.ReadCloser) (ParseResult, error) {
 		}
 	}
 	crawlDom(doc)
-	logger.Info("Finished parsing html")
 	return ParseResult{href, src}, nil
 }

@@ -14,11 +14,11 @@ const (
 )
 
 func Debug(msg string) {
-	fmt.Fprintf(os.Stderr, "%s [DEBUG]	 %s %s\n", DEBUG, RESET, msg)
+	fmt.Fprintf(os.Stderr, "%s [DEBUG]   %s %s\n", DEBUG, RESET, msg)
 }
 
 func Info(msg string) {
-	fmt.Fprintf(os.Stderr, "%s [INFO]	 %s %s\n", INFO, RESET, msg)
+	fmt.Fprintf(os.Stderr, "%s [INFO]    %s %s\n", INFO, RESET, msg)
 }
 
 func Warning(msg string) {

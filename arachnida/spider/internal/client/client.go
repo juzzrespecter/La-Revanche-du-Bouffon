@@ -19,9 +19,15 @@ type CustomClient struct {
 	maxRetries  int
 	reqSem      chan struct{}
 
-	Ctx                   *context.Context
+	Ctx                   context.Context
+	HostBound             string
 	Timeout               time.Duration
 	MaxConcurrentRequests uint
+}
+
+type CustomResponse struct {
+	Response   http.Response
+	CancelFunc context.CancelFunc
 }
 
 var retriableCodes = []int{
@@ -48,18 +54,23 @@ func backoff(retryAttempt int) time.Duration {
 
 func NewClient(
 	ctx context.Context,
+	host string,
 	timeout time.Duration,
 	maxConcurrentRequests uint) *CustomClient {
-	return &CustomClient{
+	n := &CustomClient{
 		client: &http.Client{
 			Timeout: timeout,
 		},
-		visitedUrls:           make(map[string]bool),
-		maxRetries:            3,
+		visitedUrls: make(map[string]bool),
+		maxRetries:  3,
+
+		Ctx:                   ctx,
+		HostBound:             host,
 		Timeout:               timeout,
 		MaxConcurrentRequests: maxConcurrentRequests,
 		reqSem:                make(chan struct{}, maxConcurrentRequests),
 	}
+	return n
 }
 
 func (c *CustomClient) AlreadyVisited(url string) bool {
@@ -90,8 +101,8 @@ Exponential Backoffs y retries:
 
 	sleep = jitter(min(cap, base × factor^attempt))
 */
-func (c *CustomClient) Get(url string) (*http.Response, error) {
-	ctx, cancel := context.WithTimeout(*c.Ctx, c.Timeout)
+func (c *CustomClient) Get(url string) (*CustomResponse, error) {
+	ctx, cancel := context.WithTimeout(c.Ctx, c.Timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -104,6 +115,7 @@ func (c *CustomClient) Get(url string) (*http.Response, error) {
 		case c.reqSem <- struct{}{}:
 			res, err := c.client.Do(req)
 			<-c.reqSem
+
 			switch {
 			case err != nil:
 				return nil, err
