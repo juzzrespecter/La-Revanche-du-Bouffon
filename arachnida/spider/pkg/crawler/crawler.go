@@ -36,7 +36,8 @@ func fetchImages(src []string, storage string, c *client.CustomClient) {
 
 	for _, url := range src {
 		wg.Go(func() {
-			res, err := c.Get(url)
+			res, cancel, err := c.Get(url)
+			defer cancel()
 			if err != nil {
 				e <- err
 				return
@@ -77,7 +78,8 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 				log.Debug(fmt.Sprintf("%s: already visited\n", u))
 				return
 			}
-			res, err := c.Get(u)
+			res, cancel, err := c.Get(u)
+			defer cancel()
 			if err != nil {
 				e <- err
 				return

@@ -17,7 +17,7 @@ build-spider: $(SPIDER_SRC) $(BUILD_DIR)
 
 .PHONY: build-scorpion
 build-scorpion: $(SCORPION_SRC) $(BUILD_DIR)
-	$(BUILD) -C $(SCORPION_DIR) -o ../$(TARGET_SCORPION) $(notdir $< )
+	$(BUILD) -C $(SCORPION_DIR) -o ../$(TARGET_SCORPION) $(notdir $<)
 
 $(BUILD_DIR):
 	mkdir -pv $@

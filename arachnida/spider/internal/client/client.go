@@ -101,12 +101,11 @@ Exponential Backoffs y retries:
 
 	sleep = jitter(min(cap, base × factor^attempt))
 */
-func (c *CustomClient) Get(url string) (*CustomResponse, error) {
+func (c *CustomClient) Get(url string) (*http.Response, context.CancelFunc, error) {
 	ctx, cancel := context.WithTimeout(c.Ctx, c.Timeout)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, cancel, err
 	}
 	req.Header.Set("User-Agent", utils.GetUserAgent())
 	for retry := 1; retry < c.maxRetries; retry++ {
@@ -118,23 +117,23 @@ func (c *CustomClient) Get(url string) (*CustomResponse, error) {
 
 			switch {
 			case err != nil:
-				return nil, err
+				return nil, cancel, err
 			case slices.Contains(retriableCodes, res.StatusCode):
 				retryTime := backoff(retry)
 				select {
 				case <-time.After(retryTime):
 					logger.Warning(fmt.Sprintf("Retrying for %s (attempt %d)...\n", url, retry))
 				case <-ctx.Done():
-					return nil, ctx.Err()
+					return nil, cancel, ctx.Err()
 				}
 			case res.StatusCode == http.StatusOK:
-				return res, nil
+				return res, cancel, nil
 			default:
-				return nil, fmt.Errorf("Request to %s %d", url, res.StatusCode)
+				return nil, cancel, fmt.Errorf("Request to %s %d", url, res.StatusCode)
 			}
 		default:
 			<-c.reqSem
 		}
 	}
-	return nil, fmt.Errorf("%s: max number of retries exceeded", url)
+	return nil, cancel, fmt.Errorf("%s: max number of retries exceeded", url)
 }
