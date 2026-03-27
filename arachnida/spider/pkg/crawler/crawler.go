@@ -54,8 +54,18 @@ func fetchImages(src []string, storage string, c *client.CustomClient) {
 				e <- err
 				return
 			}
-
+			info := fmt.Sprintf("%s: saved successfully", filePath)
+			log.Info(info)
 		})
+	}
+	go func() {
+		defer close(e)
+		wg.Wait()
+	}()
+	for err := range e {
+		if err != nil {
+			log.Warning(err.Error())
+		}
 	}
 }
 
@@ -138,7 +148,7 @@ func Crawl(url url.URL, cfg *Config) error {
 	recursiveCrawl = func(urls []string, lvl uint) {
 		hrefs, srcs := fetchUrls(urls, c)
 		fetchImages(srcs, storage, c)
-		logger.Debug(fmt.Sprintf("isRecursive: %d, depth: %d, lvl: %d, len: %d\n", isRecursive, depth, lvl, len(hrefs)))
+		logger.Debug(fmt.Sprintf("isRecursive: %t, depth: %d, lvl: %d, len: %d\n", isRecursive, depth, lvl, len(hrefs)))
 		if isRecursive && depth > lvl && len(hrefs) > 0 {
 			recursiveCrawl(hrefs, lvl+1)
 		}

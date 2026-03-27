@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -17,13 +16,6 @@ import (
 
 var validExts = []string{
 	".jpg", ".jpeg", ".png", ".bmp",
-}
-
-var magicNumbers = map[string][]byte{
-	".jpg":  {0xFF, 0xD8},
-	".jpeg": {0xFF, 0xD8},
-	".png":  {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
-	".bmp":  {0x42, 0x4D},
 }
 
 func Usage() {
@@ -79,52 +71,39 @@ func main() {
 				return
 			}
 			f, err := os.OpenFile(file, os.O_RDONLY, 0644)
+			defer f.Close()
 			if err != nil {
 				errs <- err
 				return
 			}
-
+			var imgInfo string
 			switch ext {
 			case ".png":
-				magic := make([]byte, 8)
-				f.Read(magic)
-				if !bytes.Equal(magic, magicNumbers[ext]) {
-					errs <- fmt.Errorf("%s: not a png file", file)
-					return
-				}
-				pngInfo, err := png.Png(f)
+				pngInfo, err := png.Png(f, file)
 				if err != nil {
 					errs <- err
 					return
 				}
-				output := commonData(file, info)
-				res <- output + pngInfo
-
+				imgInfo = pngInfo
 			case ".jpeg", ".jpg":
 				jpegInfo, err := jpeg.Jpeg(f, file)
 				if err != nil {
 					errs <- err
 				}
-				output := commonData(file, info)
-				res <- output + jpegInfo
+				imgInfo = jpegInfo
 			case ".bmp":
-				magic := make([]byte, 2)
-				f.Read(magic)
-				if !bytes.Equal(magic, magicNumbers[ext]) {
-					errs <- fmt.Errorf("%s: not a bmp file", file)
-					return
-				}
-				bmpInfo, err := bmp.Bmp(f)
+				bmpInfo, err := bmp.Bmp(f, file)
 				if err != nil {
 					errs <- err
 					return
 				}
-				output := commonData(file, info)
-				res <- output + bmpInfo
+				imgInfo = bmpInfo
 			default:
-				fmt.Println("Diantres")
+				errs <- fmt.Errorf("%s: won't do", file)
+				return
 			}
-
+			output := commonData(file, info)
+			res <- output + imgInfo
 		})
 	}
 	go func() {
@@ -139,7 +118,10 @@ func main() {
 			if e != nil {
 				fmt.Println(e.Error())
 			}
-		case r := <-res:
+		case r, ok := <-res:
+			if !ok {
+				return
+			}
 			fmt.Println(r)
 		case <-c.Done():
 			return

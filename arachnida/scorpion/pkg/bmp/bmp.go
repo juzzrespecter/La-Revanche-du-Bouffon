@@ -1,27 +1,32 @@
 package bmp
 
-import "io"
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+)
 
 type BMPHeader struct {
-	magic  uint16
-	size   uint32
-	res_1  uint16 // reserved
-	res_2  uint16 // reserved
-	offset uint32
+	//Magic  uint16
+	Size   uint32
+	Res_1  uint16 // reserved
+	Res_2  uint16 // reserved
+	Offset uint32
 }
 
 type DIBHeader struct {
-	size            uint32
-	imageWidth      uint32
-	imageHeight     uint32
-	colorPlanes     uint16
-	bitsPerPixel    uint16
-	compression     uint32
-	rawImageSize    uint32
-	pixelPerMetreX  uint32
-	pixelPerMetreY  uint32
-	colorN          uint32
-	importantColorN uint32
+	Size            uint32
+	ImageWidth      uint32
+	ImageHeight     uint32
+	ColorPlanes     uint16
+	BitsPerPixel    uint16
+	Compression     uint32
+	RawImageSize    uint32
+	PixelPerMetreX  uint32
+	PixelPerMetreY  uint32
+	ColorN          uint32
+	ImportantColorN uint32
 }
 
 var BMPVersion = map[uint32]string{
@@ -48,14 +53,66 @@ var compressionMethods = map[uint32]string{
 	13: "RLE-4",
 }
 
-func parseBMPHeader(f *io.Reader) {
-
+func parseBMPHeader(f io.Reader) (string, error) {
+	bmpHdr := &BMPHeader{}
+	err := binary.Read(f, binary.LittleEndian, bmpHdr)
+	if err != nil {
+		return "", err
+	}
+	bmpHdrInfo := fmt.Sprintf(
+		"BMP Image size:              %d\n"+
+			"Bitmap offset:               %p\n",
+		bmpHdr.Size,
+		&bmpHdr.Offset)
+	return bmpHdrInfo, nil
 }
 
-func parseDIBHeader() {
-
+func parseDIBHeader(f io.Reader) (string, error) {
+	dibHdr := &DIBHeader{}
+	err := binary.Read(f, binary.LittleEndian, dibHdr)
+	if err != nil {
+		return "", err
+	}
+	dibHdrInfo := fmt.Sprintf(
+		"Version:                     %s\n"+
+			"Image width:                 %d\n"+
+			"Image height:                %d\n"+
+			"Color planes:                %d\n"+
+			"Bits per pixel:              %d\n"+
+			"Compression:                 %s\n"+
+			"Raw image size:              %d\n"+
+			"Pixel per metre X:           %d\n"+
+			"Pixel per metre Y:           %d\n"+
+			"Colors:                      %d\n"+
+			"Important colors:            %d\n",
+		BMPVersion[dibHdr.Size],
+		dibHdr.ImageHeight,
+		dibHdr.ImageWidth,
+		dibHdr.ColorPlanes,
+		dibHdr.BitsPerPixel,
+		compressionMethods[dibHdr.Compression],
+		dibHdr.RawImageSize,
+		dibHdr.PixelPerMetreX,
+		dibHdr.PixelPerMetreY,
+		dibHdr.ColorN,
+		dibHdr.ImportantColorN,
+	)
+	return dibHdrInfo, nil
 }
 
-func Bmp(f io.Reader) (string, error) {
-	return "TODO", nil
+func Bmp(f io.Reader, file string) (string, error) {
+	magic := make([]byte, 2)
+	f.Read(magic)
+	if !bytes.Equal(magic, []byte{0x42, 0x4D}) {
+		return "", fmt.Errorf("%s: not a bmp file", file)
+	}
+	bmpHeaderInfo, err := parseBMPHeader(f)
+	if err != nil {
+		return "", nil
+	}
+	dibHdrInfo, err := parseDIBHeader(f)
+	if err != nil {
+		return "", nil
+	}
+	return bmpHeaderInfo + dibHdrInfo, nil
 }

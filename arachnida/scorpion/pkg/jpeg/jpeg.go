@@ -64,12 +64,12 @@ type APP1Data struct {
 }
 
 func parseExif(f io.Reader) (string, error) {
-	exifHdr := []byte{0x45, 0x78, 0x69, 0x66, 0x00, 0x00}
-
+	//exifHdr := []byte{0x45, 0x78, 0x69, 0x66, 0x00, 0x00}
+	return "TODO", nil
 }
 
 func parseJfif(f io.Reader) (string, error) {
-
+	return "TODO", nil
 }
 
 func Jpeg(f io.Reader, file string) (string, error) {
