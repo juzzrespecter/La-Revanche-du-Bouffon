@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"scorpion/pkg/bmp"
-	"scorpion/pkg/exif"
+	"scorpion/pkg/jpeg"
 	"scorpion/pkg/png"
 	"slices"
 	"sync"
@@ -78,7 +78,7 @@ func main() {
 				errs <- err
 				return
 			}
-			f, err := os.OpenFile(file, os.O_RDONLY, 644)
+			f, err := os.OpenFile(file, os.O_RDONLY, 0644)
 			if err != nil {
 				errs <- err
 				return
@@ -101,16 +101,9 @@ func main() {
 				res <- output + pngInfo
 
 			case ".jpeg", ".jpg":
-				magic := make([]byte, 2)
-				f.Read(magic)
-				if !bytes.Equal(magic, magicNumbers[ext]) {
-					errs <- fmt.Errorf("%s: not a jpeg file", file)
-					return
-				}
-				jpegInfo, err := exif.Exif(f)
+				jpegInfo, err := jpeg.Jpeg(f, file)
 				if err != nil {
 					errs <- err
-					return
 				}
 				output := commonData(file, info)
 				res <- output + jpegInfo

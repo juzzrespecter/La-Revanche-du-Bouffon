@@ -1,6 +1,7 @@
 package htmlparse
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"path/filepath"
@@ -23,7 +24,7 @@ func (r ParseResult) Unpack() ([]string, []string) {
 
 var parseNil ParseResult = ParseResult{nil, nil}
 
-func validateUrl(u, host string) bool {
+func validateUrl(u, host string, isSrc bool) bool {
 	urlData, err := url.Parse(u)
 	ext := filepath.Ext(u)
 	switch {
@@ -31,9 +32,10 @@ func validateUrl(u, host string) bool {
 		logger.Debug(u + ": not an URL")
 		return false
 	case urlData.Host != "" && urlData.Hostname() != host:
+		fmt.Println(urlData.Host, urlData.Hostname(), host)
 		logger.Debug(u + ": out of bounds")
 		return false
-	case slices.Contains(validTypes, ext):
+	case isSrc && slices.Contains(validTypes, ext):
 		logger.Debug(u + ": won't do")
 		return false
 	default:
@@ -55,14 +57,17 @@ func ParseHtml(htmlBody io.ReadCloser, host string) (ParseResult, error) {
 	crawlDom = func(node *html.Node) {
 		if node.Type == html.ElementNode && node.Data == "img" {
 			for _, attr := range node.Attr {
-				if attr.Key == "src" && validateUrl(attr.Val, host) {
+				if attr.Key == "src" && validateUrl(attr.Val, host, true) {
 					src = append(src, attr.Val)
 				}
 			}
 		}
 		if node.Type == html.ElementNode && node.Data == "a" {
 			for _, attr := range node.Attr {
-				if attr.Key == "href" && validateUrl(attr.Val, host) {
+				if attr.Key == "href" {
+					fmt.Println(attr.Val)
+				}
+				if attr.Key == "href" && validateUrl(attr.Val, host, false) {
 					href = append(href, attr.Val)
 				}
 			}

@@ -1,6 +1,10 @@
-package exif
+package jpeg
 
-import "io"
+import (
+	"bytes"
+	"fmt"
+	"io"
+)
 
 var TIFFTags = &map[uint32]string{
 	0x010e: "ImageDescription",
@@ -56,9 +60,34 @@ var SubIFDTags = &map[uint32]string{
 	0xa301: "SceneType",
 }
 
-func Exif(f io.Reader) (string, error) {
+type APP1Data struct {
+}
 
-	// comprobar soi
+func parseExif(f io.Reader) (string, error) {
+	exifHdr := []byte{0x45, 0x78, 0x69, 0x66, 0x00, 0x00}
+
+}
+
+func parseJfif(f io.Reader) (string, error) {
+
+}
+
+func Jpeg(f io.Reader, file string) (string, error) {
+	magic := make([]byte, 2)
+	f.Read(magic)
+	if !bytes.Equal(magic, []byte{0xFF, 0xD8}) {
+		return "", fmt.Errorf("%s: not a png file", file)
+	}
+	appMarker := make([]byte, 2)
+	f.Read(appMarker)
+	switch {
+	case bytes.Equal(appMarker, []byte{0xff, 0xe1}):
+		parseExif(f)
+	case bytes.Equal(appMarker, []byte{0xff, 0xe1}):
+		parseJfif(f)
+	default:
+		return "", nil
+	}
 
 	// comprobar app markers
 

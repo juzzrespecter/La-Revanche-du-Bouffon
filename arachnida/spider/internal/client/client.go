@@ -25,11 +25,6 @@ type CustomClient struct {
 	MaxConcurrentRequests uint
 }
 
-type CustomResponse struct {
-	Response   http.Response
-	CancelFunc context.CancelFunc
-}
-
 var retriableCodes = []int{
 	http.StatusRequestTimeout,
 	http.StatusTooEarly,
