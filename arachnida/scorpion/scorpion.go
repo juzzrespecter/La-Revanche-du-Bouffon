@@ -71,11 +71,11 @@ func main() {
 				return
 			}
 			f, err := os.OpenFile(file, os.O_RDONLY, 0644)
-			defer f.Close()
 			if err != nil {
 				errs <- err
 				return
 			}
+			defer f.Close()
 			var imgInfo string
 			switch ext {
 			case ".png":

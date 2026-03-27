@@ -1,12 +1,12 @@
 package htmlparse
 
 import (
-	"fmt"
 	"io"
 	"net/url"
 	"path/filepath"
 	"slices"
 	"spider/internal/logger"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -26,17 +26,20 @@ var parseNil ParseResult = ParseResult{nil, nil}
 
 func validateUrl(u, host string, isSrc bool) bool {
 	urlData, err := url.Parse(u)
+	if err != nil {
+		return false
+	}
 	ext := filepath.Ext(u)
+	hostname := strings.TrimPrefix(urlData.Hostname(), "www.")
 	switch {
 	case err != nil:
-		logger.Debug(u + ": not an URL")
+		//logger.Debug(u + ": not an URL")
 		return false
-	case urlData.Host != "" && urlData.Hostname() != host:
-		fmt.Println(urlData.Host, urlData.Hostname(), host)
-		logger.Debug(u + ": out of bounds")
+	case urlData.Host != "" && hostname != host:
+		//logger.Debug(u + ": out of bounds")
 		return false
-	case isSrc && slices.Contains(validTypes, ext):
-		logger.Debug(u + ": won't do")
+	case isSrc && !slices.Contains(validTypes, ext):
+		//logger.Debug(u + ": won't do")
 		return false
 	default:
 		return true
@@ -64,9 +67,6 @@ func ParseHtml(htmlBody io.ReadCloser, host string) (ParseResult, error) {
 		}
 		if node.Type == html.ElementNode && node.Data == "a" {
 			for _, attr := range node.Attr {
-				if attr.Key == "href" {
-					fmt.Println(attr.Val)
-				}
 				if attr.Key == "href" && validateUrl(attr.Val, host, false) {
 					href = append(href, attr.Val)
 				}

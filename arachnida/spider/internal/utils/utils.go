@@ -89,13 +89,14 @@ func SetUpURL(origin *url.URL, href string) string {
 
 func GenerateFileName(dir, u string) string {
 	parsedUrl, _ := url.Parse(u)
-	filePath := dir + path.Base(parsedUrl.Path)
+	base := dir + path.Base(parsedUrl.Path)
+	filePath := base
 	for i := range 1000 {
 		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
 			ext := filepath.Ext(filePath)
 			filePath = fmt.Sprintf(
 				"%s(%d)%s",
-				strings.TrimSuffix(filePath, ext),
+				strings.TrimSuffix(base, ext),
 				i,
 				ext,
 			)

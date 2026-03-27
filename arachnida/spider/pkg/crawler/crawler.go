@@ -85,7 +85,6 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 				return
 			}
 			if c.AlreadyVisited(u) {
-				log.Debug(fmt.Sprintf("%s: already visited\n", u))
 				return
 			}
 			res, cancel, err := c.Get(u)
@@ -104,6 +103,9 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 			for i, ref := range refs.Href {
 				refs.Href[i] = utils.SetUpURL(urlData, ref)
 			}
+			for i, src := range refs.Src {
+				refs.Src[i] = utils.SetUpURL(urlData, src)
+			}
 			r <- refs
 		})
 	}
@@ -111,7 +113,6 @@ func fetchUrls(urls []string, c *client.CustomClient) ([]string, []string) {
 		wg.Wait()
 		close(r)
 		close(e)
-		fmt.Println("Cancelling")
 		cancel()
 	}()
 
@@ -142,6 +143,7 @@ func Crawl(url url.URL, cfg *Config) error {
 		cfg.Timeout,
 		cfg.MaxConcurrentRequests,
 	)
+	defer c.CloseRequestSemaphore()
 	isRecursive, depth, storage := cfg.Unpack()
 	urls := []string{url.String()}
 	var recursiveCrawl func([]string, uint)
@@ -154,5 +156,6 @@ func Crawl(url url.URL, cfg *Config) error {
 		}
 	}
 	recursiveCrawl(urls, 1)
+	log.Info("Done.")
 	return nil
 }

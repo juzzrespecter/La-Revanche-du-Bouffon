@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"slices"
@@ -15,7 +16,7 @@ import (
 type CustomClient struct {
 	client      *http.Client
 	visitedUrls map[string]bool
-	m           sync.RWMutex
+	m           sync.Mutex
 	maxRetries  int
 	reqSem      chan struct{}
 
@@ -36,7 +37,7 @@ var retriableCodes = []int{
 }
 
 func backoff(retryAttempt int) time.Duration {
-	base := 500 * time.Millisecond
+	base := 2000 * time.Millisecond
 	max := 10 * time.Second
 
 	x := time.Duration(1<<retryAttempt) * base
@@ -68,13 +69,17 @@ func NewClient(
 	return n
 }
 
+func (c *CustomClient) CloseRequestSemaphore() {
+	close(c.reqSem)
+}
+
 func (c *CustomClient) AlreadyVisited(url string) bool {
-	c.m.RLock()
+	c.m.Lock()
 	status := c.visitedUrls[url]
 	if status == false {
 		c.visitedUrls[url] = true
 	}
-	c.m.RUnlock()
+	c.m.Unlock()
 	return status
 }
 
@@ -104,16 +109,21 @@ func (c *CustomClient) Get(url string) (*http.Response, context.CancelFunc, erro
 	}
 	req.Header.Set("User-Agent", utils.GetUserAgent())
 	for retry := 1; retry < c.maxRetries; retry++ {
-		req := req.Clone(req.Context())
+		if retry > 1 {
+			req = req.Clone(req.Context())
+		}
 		select {
 		case c.reqSem <- struct{}{}:
 			res, err := c.client.Do(req)
 			<-c.reqSem
-
 			switch {
 			case err != nil:
 				return nil, cancel, err
 			case slices.Contains(retriableCodes, res.StatusCode):
+				logger.Warning(fmt.Sprintf("Retrying for %s (status: %d) (attempt %d)...\n", url, res.StatusCode, retry))
+				io.Copy(io.Discard, res.Body)
+
+				res.Body.Close()
 				retryTime := backoff(retry)
 				select {
 				case <-time.After(retryTime):
@@ -124,10 +134,12 @@ func (c *CustomClient) Get(url string) (*http.Response, context.CancelFunc, erro
 			case res.StatusCode == http.StatusOK:
 				return res, cancel, nil
 			default:
+				io.Copy(io.Discard, res.Body)
+				res.Body.Close()
 				return nil, cancel, fmt.Errorf("Request to %s %d", url, res.StatusCode)
 			}
-		default:
-			<-c.reqSem
+		case <-ctx.Done():
+			return nil, cancel, ctx.Err()
 		}
 	}
 	return nil, cancel, fmt.Errorf("%s: max number of retries exceeded", url)

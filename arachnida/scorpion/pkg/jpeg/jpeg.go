@@ -5,12 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strconv"
 )
-
-type IFDTag struct {
-	Name string
-	Fmt  int
-}
 
 type IFDEntry struct {
 	Tag uint16
@@ -20,17 +16,32 @@ type IFDEntry struct {
 }
 
 func formatIFD(ifd *IFDEntry) string {
+	fmtSize := map[uint16]uint32{
+		1: 1, 2: 1, 3: 2, 4: 4, 5: 8,
+	}
 	x := fmt.Sprintf(
 		"Tag: %d\n"+
 			"Fmt: %d\n"+
 			"N  : %d\n"+
 			"Val: %d\n"+
 			"Cos: %s\n",
-		ifd.Tag, ifd.Fmt, ifd.N, ifd.Val, IFDTags[uint32(ifd.Tag)],
+		ifd.Tag, ifd.Fmt, ifd.N, ifd.Val, IFDTags[ifd.Tag],
 	)
+	size := ifd.N * fmtSize[ifd.Fmt]
+	var value string
+	if size <= 4 {
+		switch ifd.Fmt {
+		case 1, 3, 4:
+			value = strconv.FormatUint(uint64(ifd.Val), 10)
+		case 2:
+			value = string(ifd.Val)
+		}
+	} else {
+		value = "Offset"
+	}
 
 	// format
-	fmt.Println(x)
+	fmt.Printf("%s      : %s\n", IFDTags[ifd.Tag], value)
 	return x
 }
 
@@ -65,7 +76,7 @@ func parseExif(f io.Reader) (string, error) {
 	offset := byteOrder.Uint32(tiffHdr[4:]) - 8
 	if offset != 0 {
 		if _, err := io.CopyN(io.Discard, f, int64(offset)); err != nil {
-			return "", fmt.Errorf("offset error")
+			return "", fmt.Errorf("offset error: %w", err)
 		}
 	}
 	for {
@@ -93,9 +104,10 @@ func parseExif(f io.Reader) (string, error) {
 		if offset == 0 {
 			break
 		}
+		fmt.Println("offset ", offset)
 		offset = offset - 8
 		if _, err := io.CopyN(io.Discard, f, int64(offset)); err != nil {
-			return "", fmt.Errorf("offset error")
+			return "", fmt.Errorf("offset error: %w, %d", err, offset)
 		}
 	}
 
