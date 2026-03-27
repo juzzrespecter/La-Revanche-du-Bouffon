@@ -79,22 +79,22 @@ func main() {
 			var imgInfo string
 			switch ext {
 			case ".png":
-				pngInfo, err := png.Png(f, file)
+				pngInfo, err := png.Png(f)
 				if err != nil {
-					errs <- err
+					errs <- fmt.Errorf("%s: %s", file, err)
 					return
 				}
 				imgInfo = pngInfo
 			case ".jpeg", ".jpg":
-				jpegInfo, err := jpeg.Jpeg(f, file)
+				jpegInfo, err := jpeg.Jpeg(f)
 				if err != nil {
-					errs <- err
+					errs <- fmt.Errorf("%s: %s", file, err)
 				}
 				imgInfo = jpegInfo
 			case ".bmp":
-				bmpInfo, err := bmp.Bmp(f, file)
+				bmpInfo, err := bmp.Bmp(f)
 				if err != nil {
-					errs <- err
+					errs <- fmt.Errorf("%s: %s", file, err)
 					return
 				}
 				imgInfo = bmpInfo

@@ -100,11 +100,11 @@ func parseDIBHeader(f io.Reader) (string, error) {
 	return dibHdrInfo, nil
 }
 
-func Bmp(f io.Reader, file string) (string, error) {
+func Bmp(f io.Reader) (string, error) {
 	magic := make([]byte, 2)
 	f.Read(magic)
 	if !bytes.Equal(magic, []byte{0x42, 0x4D}) {
-		return "", fmt.Errorf("%s: not a bmp file", file)
+		return "", fmt.Errorf("not a bmp file")
 	}
 	bmpHeaderInfo, err := parseBMPHeader(f)
 	if err != nil {

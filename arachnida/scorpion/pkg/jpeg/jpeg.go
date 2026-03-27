@@ -2,69 +2,103 @@ package jpeg
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 )
 
-var TIFFTags = &map[uint32]string{
-	0x010e: "ImageDescription",
-	0x010f: "Make",
-	0x0110: "Model",
-	0x0112: "Orientation",
-	0x011a: "XResolution",
-	0x011b: "YResolution",
-	0x0128: "ResolutionUnit",
-	0x0131: "Software",
-	0x0132: "DateTime",
-	0x013e: "WhitePoint",
-	0x013f: "PrimaryChromaticities",
-	0x0211: "YCbCrCoefficients",
-	0x0213: "YCbCrPositioning",
-	0x0214: "ReferenceBlackWhite",
-	0x8298: "Copyright",
+type IFDTag struct {
+	Name string
+	Fmt  int
 }
 
-var SubIFDTags = &map[uint32]string{
-	0x829a: "ExposureTime",
-	0x829d: "FNumber",
-	0x8822: "ExposureProgram",
-	0x8827: "ISOSpeedRatings",
-	0x9000: "ExifVersion",
-	0x9003: "DateTimeOriginal",
-	0x9004: "DateTimeDigitized",
-	0x9101: "ComponentConfiguration",
-	0x9102: "CompressedBitsPerPixel",
-	0x9201: "ShutterSpeedValue",
-	0x9202: "ApertureValue",
-	0x9203: "BrightnessValue",
-	0x9204: "ExposureBiasValue",
-	0x9205: "MaxApertureValue",
-	0x9206: "SubjectDistance",
-	0x9207: "MeteringMode",
-	0x9208: "LightSource",
-	0x9209: "Flash",
-	0x920a: "FocalLength",
-	0x927c: "MakerNote",
-	0x9286: "UserComment",
-	0xa000: "FlashPixVersion",
-	0xa001: "ColorSpace",
-	0xa002: "ExifImageWidth",
-	0xa003: "ExifImageHeight",
-	0xa004: "RelatedSoundFile",
-	0xa005: "ExifInteroperabilityOffset",
-	0xa20e: "FocalPlaneXResolution",
-	0xa20f: "FocalPlaneYResolution",
-	0xa210: "FocalPlaneResolutionUnit",
-	0xa217: "SensingMethod",
-	0xa300: "FileSource",
-	0xa301: "SceneType",
+type IFDEntry struct {
+	Tag uint16
+	Fmt uint16
+	N   uint32
+	Val uint32
 }
 
-type APP1Data struct {
+func formatIFD(ifd *IFDEntry) string {
+	x := fmt.Sprintf(
+		"Tag: %d\n"+
+			"Fmt: %d\n"+
+			"N  : %d\n"+
+			"Val: %d\n"+
+			"Cos: %s\n",
+		ifd.Tag, ifd.Fmt, ifd.N, ifd.Val, IFDTags[uint32(ifd.Tag)],
+	)
+
+	// format
+	fmt.Println(x)
+	return x
 }
 
 func parseExif(f io.Reader) (string, error) {
-	//exifHdr := []byte{0x45, 0x78, 0x69, 0x66, 0x00, 0x00}
+	buffer := make([]byte, 8)
+	err := binary.Read(f, binary.LittleEndian, buffer)
+	if err != nil {
+		return "", err
+	}
+	exifHdr := buffer[2:]
+	if !bytes.Equal(exifHdr, []byte{0x45, 0x78, 0x69, 0x66, 0x00, 0x00}) {
+		fmt.Println("Not an exif header, silently exit") // borrame
+		return "", nil
+	}
+	tiffHdr := make([]byte, 8)
+	err = binary.Read(f, binary.LittleEndian, tiffHdr)
+	if err != nil {
+		return "", err
+	}
+	var byteOrder binary.ByteOrder
+	switch string(tiffHdr[:2]) {
+	case "MM":
+		byteOrder = binary.BigEndian
+	case "II":
+		byteOrder = binary.LittleEndian
+	default:
+		return "", fmt.Errorf("invalid byte order")
+	}
+	if byteOrder.Uint16(tiffHdr[2:4]) != 42 {
+		return "", fmt.Errorf("invalid TIFF magic number")
+	}
+	offset := byteOrder.Uint32(tiffHdr[4:]) - 8
+	if offset != 0 {
+		if _, err := io.CopyN(io.Discard, f, int64(offset)); err != nil {
+			return "", fmt.Errorf("offset error")
+		}
+	}
+	for {
+		var n int16
+		if err := binary.Read(f, byteOrder, &n); err != nil {
+			return "", err
+		}
+		for i := 0; i < int(n); i++ {
+			entryBuffer := make([]byte, 16)
+			if err := binary.Read(f, byteOrder, entryBuffer); err != nil {
+				return "", err
+			}
+			entry := &IFDEntry{
+				Tag: byteOrder.Uint16(entryBuffer[:2]),
+				Fmt: byteOrder.Uint16(entryBuffer[2:4]),
+				N:   byteOrder.Uint32(entryBuffer[4:8]),
+				Val: byteOrder.Uint32(entryBuffer[8:]),
+			}
+			formatIFD(entry)
+		}
+		var offset uint32
+		if err := binary.Read(f, byteOrder, &offset); err != nil {
+			return "", err
+		}
+		if offset == 0 {
+			break
+		}
+		offset = offset - 8
+		if _, err := io.CopyN(io.Discard, f, int64(offset)); err != nil {
+			return "", fmt.Errorf("offset error")
+		}
+	}
+
 	return "TODO", nil
 }
 
@@ -72,32 +106,31 @@ func parseJfif(f io.Reader) (string, error) {
 	return "TODO", nil
 }
 
-func Jpeg(f io.Reader, file string) (string, error) {
+func Jpeg(f io.Reader) (string, error) {
+	var jpegInfo string
+
 	magic := make([]byte, 2)
 	f.Read(magic)
 	if !bytes.Equal(magic, []byte{0xFF, 0xD8}) {
-		return "", fmt.Errorf("%s: not a png file", file)
+		return "", fmt.Errorf("not a png file")
 	}
 	appMarker := make([]byte, 2)
 	f.Read(appMarker)
 	switch {
 	case bytes.Equal(appMarker, []byte{0xff, 0xe1}):
-		parseExif(f)
+		info, err := parseExif(f)
+		if err != nil {
+			return "", err
+		}
+		jpegInfo = info
 	case bytes.Equal(appMarker, []byte{0xff, 0xe1}):
-		parseJfif(f)
+		info, err := parseJfif(f)
+		if err != nil {
+			return "", err
+		}
+		jpegInfo = info
 	default:
 		return "", nil
 	}
-
-	// comprobar app markers
-
-	// ejemplo binario -> struct
-	//	t := T{A: 0xEEFFEEFF, B: 3.14}
-	//buf := &bytes.Buffer{}
-	//err := binary.Write(buf, binary.BigEndian, t)
-	//if err != nil {
-	//    panic(err)
-	//}
-	//fmt.Println(buf.Bytes())
-	return "TODO", nil
+	return jpegInfo, nil
 }
