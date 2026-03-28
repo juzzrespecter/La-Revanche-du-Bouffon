@@ -5,44 +5,41 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"strconv"
+	"scorpion/internal/ifd"
 )
 
-type IFDEntry struct {
-	Tag uint16
-	Fmt uint16
-	N   uint32
-	Val uint32
-}
+// Parseo recursivo de las tablas IFD
+//
+// * base:  bytearray que parte desde la cabecera TIFF
+// * o:     offset desde el comienzo de la tabla
+// * order: byte order
+func parseIFDTable(base []byte, o uint32, order binary.ByteOrder) (string, uint32, error) {
+	var fmtTag string
 
-func formatIFD(ifd *IFDEntry) string {
-	fmtSize := map[uint16]uint32{
-		1: 1, 2: 1, 3: 2, 4: 4, 5: 8,
-	}
-	x := fmt.Sprintf(
-		"Tag: %d\n"+
-			"Fmt: %d\n"+
-			"N  : %d\n"+
-			"Val: %d\n"+
-			"Cos: %s\n",
-		ifd.Tag, ifd.Fmt, ifd.N, ifd.Val, IFDTags[ifd.Tag],
-	)
-	size := ifd.N * fmtSize[ifd.Fmt]
-	var value string
-	if size <= 4 {
-		switch ifd.Fmt {
-		case 1, 3, 4:
-			value = strconv.FormatUint(uint64(ifd.Val), 10)
-		case 2:
-			value = string(ifd.Val)
+	n := order.Uint16(base[o : o+2])
+	ifdOffset := uint32(0)
+	fmt.Printf("[IFD] %d values\n", n)
+	for i := 0; i < int(n); i++ {
+		ifdOffset = o + 12*uint32(i) + 2
+		ifdRawEntry := base[ifdOffset : ifdOffset+12]
+		ifdEntry := &ifd.IFDEntry{
+			Tag: order.Uint16(ifdRawEntry[:2]),
+			Fmt: order.Uint16(ifdRawEntry[2:4]),
+			N:   order.Uint32(ifdRawEntry[4:8]),
+			Val: order.Uint32(ifdRawEntry[8:]),
 		}
-	} else {
-		value = "Offset"
+		switch ifdEntry.Tag {
+		case 0x8769, 0x8825: // SubIFDs
+			tags, _, err := parseIFDTable(base, ifdEntry.Val, order)
+			if err != nil {
+				return "", 0, err
+			}
+			fmtTag = fmtTag + tags
+		}
+		fmtTag = fmtTag + ifdEntry.FormatIFD(base, order)
 	}
-
-	// format
-	fmt.Printf("%s      : %s\n", IFDTags[ifd.Tag], value)
-	return x
+	ifdOffset = order.Uint32(base[ifdOffset+12 : ifdOffset+12+8])
+	return fmtTag, ifdOffset, nil
 }
 
 func parseExif(f io.Reader) (string, error) {
@@ -53,65 +50,39 @@ func parseExif(f io.Reader) (string, error) {
 	}
 	exifHdr := buffer[2:]
 	if !bytes.Equal(exifHdr, []byte{0x45, 0x78, 0x69, 0x66, 0x00, 0x00}) {
-		fmt.Println("Not an exif header, silently exit") // borrame
 		return "", nil
 	}
-	tiffHdr := make([]byte, 8)
-	err = binary.Read(f, binary.LittleEndian, tiffHdr)
+	base, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}
-	var byteOrder binary.ByteOrder
-	switch string(tiffHdr[:2]) {
+	// TIFF Header
+	var order binary.ByteOrder
+	switch string(base[:2]) {
 	case "MM":
-		byteOrder = binary.BigEndian
+		order = binary.BigEndian
 	case "II":
-		byteOrder = binary.LittleEndian
+		order = binary.LittleEndian
 	default:
 		return "", fmt.Errorf("invalid byte order")
 	}
-	if byteOrder.Uint16(tiffHdr[2:4]) != 42 {
+	if order.Uint16(base[2:4]) != 42 {
 		return "", fmt.Errorf("invalid TIFF magic number")
 	}
-	offset := byteOrder.Uint32(tiffHdr[4:]) - 8
-	if offset != 0 {
-		if _, err := io.CopyN(io.Discard, f, int64(offset)); err != nil {
-			return "", fmt.Errorf("offset error: %w", err)
-		}
-	}
+	tiffOffset := 4 + order.Uint32(base[4:8]) - 8
+
+	var tags string
 	for {
-		var n int16
-		if err := binary.Read(f, byteOrder, &n); err != nil {
+		tableTags, nextOffset, err := parseIFDTable(base, tiffOffset, order)
+		if err != nil {
 			return "", err
 		}
-		for i := 0; i < int(n); i++ {
-			entryBuffer := make([]byte, 16)
-			if err := binary.Read(f, byteOrder, entryBuffer); err != nil {
-				return "", err
-			}
-			entry := &IFDEntry{
-				Tag: byteOrder.Uint16(entryBuffer[:2]),
-				Fmt: byteOrder.Uint16(entryBuffer[2:4]),
-				N:   byteOrder.Uint32(entryBuffer[4:8]),
-				Val: byteOrder.Uint32(entryBuffer[8:]),
-			}
-			formatIFD(entry)
-		}
-		var offset uint32
-		if err := binary.Read(f, byteOrder, &offset); err != nil {
-			return "", err
-		}
-		if offset == 0 {
+		tags = tags + tableTags
+		if nextOffset == 0 {
 			break
 		}
-		fmt.Println("offset ", offset)
-		offset = offset - 8
-		if _, err := io.CopyN(io.Discard, f, int64(offset)); err != nil {
-			return "", fmt.Errorf("offset error: %w, %d", err, offset)
-		}
 	}
-
-	return "TODO", nil
+	return tags, nil
 }
 
 func parseJfif(f io.Reader) (string, error) {
