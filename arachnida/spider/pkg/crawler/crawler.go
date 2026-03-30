@@ -36,6 +36,9 @@ func fetchImages(src []string, storage string, c *client.CustomClient) {
 
 	for _, url := range src {
 		wg.Go(func() {
+			if c.AlreadyVisited(url) {
+				return
+			}
 			res, cancel, err := c.Get(url)
 			defer cancel()
 			if err != nil {
@@ -150,8 +153,8 @@ func Crawl(url url.URL, cfg *Config) error {
 	recursiveCrawl = func(urls []string, lvl uint) {
 		hrefs, srcs := fetchUrls(urls, c)
 		fetchImages(srcs, storage, c)
-		logger.Debug(fmt.Sprintf("isRecursive: %t, depth: %d, lvl: %d, len: %d\n", isRecursive, depth, lvl, len(hrefs)))
 		if isRecursive && depth > lvl && len(hrefs) > 0 {
+			logger.Info(fmt.Sprintf("Trying depth level: %d...\n", lvl))
 			recursiveCrawl(hrefs, lvl+1)
 		}
 	}

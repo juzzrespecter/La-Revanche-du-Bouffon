@@ -32,10 +32,7 @@ func validateUrl(u, host string, isSrc bool) bool {
 	ext := filepath.Ext(u)
 	hostname := strings.TrimPrefix(urlData.Hostname(), "www.")
 	switch {
-	case err != nil:
-		//logger.Debug(u + ": not an URL")
-		return false
-	case urlData.Host != "" && hostname != host:
+	case !isSrc && urlData.Host != "" && hostname != host:
 		//logger.Debug(u + ": out of bounds")
 		return false
 	case isSrc && !slices.Contains(validTypes, ext):

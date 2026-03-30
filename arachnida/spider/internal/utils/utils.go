@@ -82,7 +82,12 @@ func GetUserAgent() string {
 func SetUpURL(origin *url.URL, href string) string {
 	valid, err := url.ParseRequestURI(href)
 	if err != nil || valid.Host == "" || valid.Scheme == "" {
-		href = origin.Scheme + "://" + origin.Host + href
+		switch {
+		case err == nil && valid.Host == "" && strings.HasPrefix(href, "//"):
+			href = origin.Scheme + "://" + strings.TrimPrefix(href, "//")
+		default:
+			href = origin.Scheme + "://" + origin.Host + href
+		}
 	}
 	return href
 }

@@ -3,7 +3,9 @@ package ifd
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 )
 
 type IFDEntry struct {
@@ -18,10 +20,10 @@ var fmtSize = map[uint16]uint32{
 	7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 4,
 }
 
-func (ifd *IFDEntry) getValue(base []byte) ([]byte, uint32) {
+func (ifd *IFDEntry) getValue(base []byte) []byte {
 	size := fmtSize[ifd.Fmt] * ifd.N
 	if size > 4 {
-		return base[ifd.Val : ifd.Val+size], size
+		return base[ifd.Val : ifd.Val+size]
 	}
 	value := []byte{
 		uint8(ifd.Val),
@@ -29,42 +31,56 @@ func (ifd *IFDEntry) getValue(base []byte) ([]byte, uint32) {
 		uint8(ifd.Val) << 2,
 		uint8(ifd.Val) << 3,
 	}
-	return value, size
+	return value
 }
 
 func (ifd *IFDEntry) FormatIFD(base []byte, order binary.ByteOrder) string {
-	entry := fmt.Sprintf("%s:", IFDTags[ifd.Tag])
-
-	value, size := ifd.getValue(base)
+	value := ifd.getValue(base)
 	valueArr := [][]byte{}
+	e := fmtSize[ifd.Fmt]
 	for i := uint32(0); i < ifd.N; i++ {
-		valueArr = append(valueArr, value[i*size:i*size+size])
+		valueArr = append(valueArr, value[i*e:i*e+e])
 	}
-	fmt.Println(value, valueArr, size)
+	//fmt.Printf("IFDEntry getValues: \nNumber of values: %d\nValue array: %v (length: %d)\nArray of values (offset): %v\nActual size of value: %d\n\n",
+	//	ifd.N, value, len(value), valueArr, size,
+	//)
+	var valueString []string
 	switch ifd.Fmt {
 	case 1, 3, 4: // unsigned numbers
 		for _, x := range valueArr {
-			y := order.Uint64(x)
-			entry = entry + ", " + strconv.FormatUint(y, 10)
+			y := order.Uint16(x)
+			valueString = append(valueString, strconv.FormatUint(uint64(y), 10))
 		}
 	case 6, 8, 9: // signed numbers
 		for _, x := range valueArr {
 			y := int64(order.Uint64(x))
-			entry = entry + ", " + strconv.FormatInt(y, 10)
+			valueString = append(valueString, strconv.FormatInt(y, 10))
 		}
 	case 2: // string
-		entry = entry + string(value)
-	case 5:
+		valueString = append(valueString, string(value))
+	case 5: // unsigned rational
 		for _, x := range valueArr {
-			// [][]byte, cada []byte se debe transformar en dos unsigned logns
-			n := order.Uint16(x[:2])
-			d := order.Uint16(x[2:])
+			n := float64(order.Uint16(x[:4]))
+			d := float64(order.Uint16(x[4:]))
+			valueString = append(valueString, strconv.FormatFloat(n/d, 'f', -1, 64))
 		}
 	case 7:
-		entry = entry + "undef."
-	case 10: // signed rationa;
+		valueString = append(valueString, "undef.")
+	case 10: // signed rational
+		for _, x := range valueArr {
+			n := float64(int16(order.Uint16(x[:4])))
+			d := float64(int16(order.Uint16(x[4:])))
+
+			valueString = append(valueString, strconv.FormatFloat(n/d, 'f', -1, 64))
+		}
 	case 11, 12: // floats
+		for _, x := range valueArr {
+			bits := binary.LittleEndian.Uint64(x)
+			float := math.Float64frombits(bits)
+			valueString = append(valueString, strconv.FormatFloat(float, 'f', -1, 64))
+		}
+
 	}
-	entry = entry + "\n"
-	return entry
+
+	return fmt.Sprintf("%-*s%s\n", 31, IFDTags[ifd.Tag]+":", strings.Join(valueString, ","))
 }

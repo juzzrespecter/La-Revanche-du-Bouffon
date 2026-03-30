@@ -18,7 +18,6 @@ func parseIFDTable(base []byte, o uint32, order binary.ByteOrder) (string, uint3
 
 	n := order.Uint16(base[o : o+2])
 	ifdOffset := uint32(0)
-	fmt.Printf("[IFD] %d values\n", n)
 	for i := 0; i < int(n); i++ {
 		ifdOffset = o + 12*uint32(i) + 2
 		ifdRawEntry := base[ifdOffset : ifdOffset+12]
@@ -30,16 +29,19 @@ func parseIFDTable(base []byte, o uint32, order binary.ByteOrder) (string, uint3
 		}
 		switch ifdEntry.Tag {
 		case 0x8769, 0x8825: // SubIFDs
-			tags, _, err := parseIFDTable(base, ifdEntry.Val, order)
+			tags, o, err := parseIFDTable(base, ifdEntry.Val, order)
 			if err != nil {
 				return "", 0, err
 			}
 			fmtTag = fmtTag + tags
+			if o == 0 {
+				return fmtTag, o, nil
+			}
 		}
 		fmtTag = fmtTag + ifdEntry.FormatIFD(base, order)
 	}
-	ifdOffset = order.Uint32(base[ifdOffset+12 : ifdOffset+12+8])
-	return fmtTag, ifdOffset, nil
+	x := order.Uint32(base[ifdOffset+12 : ifdOffset+12+8])
+	return fmtTag, x, nil
 }
 
 func parseExif(f io.Reader) (string, error) {
@@ -69,10 +71,10 @@ func parseExif(f io.Reader) (string, error) {
 	if order.Uint16(base[2:4]) != 42 {
 		return "", fmt.Errorf("invalid TIFF magic number")
 	}
-	tiffOffset := 4 + order.Uint32(base[4:8]) - 8
-
+	tiffOffset := order.Uint32(base[4:8])
+	nextOffset := tiffOffset
 	var tags string
-	for {
+	for nextOffset != 0 {
 		tableTags, nextOffset, err := parseIFDTable(base, tiffOffset, order)
 		if err != nil {
 			return "", err

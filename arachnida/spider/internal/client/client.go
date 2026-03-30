@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"io"
 	"math/rand"
 	"net/http"
 	"slices"
@@ -121,9 +120,6 @@ func (c *CustomClient) Get(url string) (*http.Response, context.CancelFunc, erro
 				return nil, cancel, err
 			case slices.Contains(retriableCodes, res.StatusCode):
 				logger.Warning(fmt.Sprintf("Retrying for %s (status: %d) (attempt %d)...\n", url, res.StatusCode, retry))
-				io.Copy(io.Discard, res.Body)
-
-				res.Body.Close()
 				retryTime := backoff(retry)
 				select {
 				case <-time.After(retryTime):
@@ -134,8 +130,6 @@ func (c *CustomClient) Get(url string) (*http.Response, context.CancelFunc, erro
 			case res.StatusCode == http.StatusOK:
 				return res, cancel, nil
 			default:
-				io.Copy(io.Discard, res.Body)
-				res.Body.Close()
 				return nil, cancel, fmt.Errorf("Request to %s %d", url, res.StatusCode)
 			}
 		case <-ctx.Done():
