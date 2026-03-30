@@ -11,5 +11,9 @@ RUN make build
 
 FROM golang:bookworm
 
-COPY --from=build /opt/bin/ft_otp /opt/ft_otp
-ENTRYPOINT ["/opt/ft_otp"]
+RUN apt update && \
+    apt install -y oathtool xxd && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /opt/bin/ft_otp /usr/bin/ft_otp
+ENTRYPOINT ["ft_otp"]

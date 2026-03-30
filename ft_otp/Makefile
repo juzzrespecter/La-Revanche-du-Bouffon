@@ -1,8 +1,9 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
+BIN ?= ft_otp
 BUILD_DIR ?= ./bin
-TARGET ?= $(addprefix $(BUILD_DIR)/, ft_otp)
+TARGET ?= $(addprefix $(BUILD_DIR)/, $(BIN))
 MAIN ?= ft_otp.go
 
 GO ?= go
@@ -28,6 +29,6 @@ clean: $(TARGET)
 	@echo "$(MAKECMDGOALS): unknown rule"
 	@echo "usage:"
 	@echo ""
-	@echo "build:	Generate binary"
-	@echo "run: 	Run program"
+	@echo "build:	Generate ft_otp binary"
+	@echo "run: 	Run ft_otp"
 	@echo "clean:   Remove binary"

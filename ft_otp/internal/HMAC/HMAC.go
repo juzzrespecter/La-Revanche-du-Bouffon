@@ -1,4 +1,4 @@
-package HMAC
+package hmac
 
 import (
 	"crypto/sha1"
