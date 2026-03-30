@@ -44,8 +44,11 @@ func Png(f io.Reader) (string, error) {
 		case "IEND":
 			return metadata, nil
 		case "iTXt", "tEXt", "zTXt":
-			o := img[offset+8 : offset+8+int(chunkLength)]
-			fmt.Println(chunkTag, string(o), o)
+			text := img[offset+8 : offset+8+int(chunkLength)]
+			textArray := bytes.Split(text, []byte{0})
+			key := string(textArray[0])
+			val := string(bytes.Trim(textArray[1], string([]byte{0})))
+			metadata = metadata + fmt.Sprintf("%-31s%s\n", key, val)
 			offset = offset + 12 + int(chunkLength)
 		default:
 			offset = offset + 12 + int(chunkLength)

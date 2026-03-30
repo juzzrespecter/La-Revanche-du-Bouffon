@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"scorpion/internal/ifd"
+	"scorpion/internal/jfif"
 )
 
 // Parseo recursivo de las tablas IFD
@@ -88,7 +89,26 @@ func parseExif(f io.Reader) (string, error) {
 }
 
 func parseJfif(f io.Reader) (string, error) {
-	return "TODO", nil
+	img, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	// APP0 Marker segment
+	app0 := &jfif.JFIFApp0{
+		Length:      binary.BigEndian.Uint16(img[:2]),
+		Id:          img[2:7],
+		Version:     binary.BigEndian.Uint16(img[7:9]),
+		DensityUnit: uint8(img[9]),
+		Xdensity:    binary.BigEndian.Uint16(img[10:12]),
+		Ydensity:    binary.BigEndian.Uint16(img[12:14]),
+		Xthumbnail:  uint8(img[14]),
+		Ythumbnail:  uint8(img[15]),
+	}
+	if !bytes.Equal(app0.Id, []byte{0x4A, 0x46, 0x49, 0x46, 0x00}) {
+		return "", fmt.Errorf("Invalid JFIF ID")
+	}
+	metadata := app0.GetMetadata()
+	return metadata, nil
 }
 
 func Jpeg(f io.Reader) (string, error) {
@@ -108,7 +128,7 @@ func Jpeg(f io.Reader) (string, error) {
 			return "", err
 		}
 		jpegInfo = info
-	case bytes.Equal(appMarker, []byte{0xff, 0xe1}):
+	case bytes.Equal(appMarker, []byte{0xff, 0xe0}):
 		info, err := parseJfif(f)
 		if err != nil {
 			return "", err

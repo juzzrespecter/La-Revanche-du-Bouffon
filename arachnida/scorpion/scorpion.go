@@ -33,9 +33,9 @@ func commonData(file string, info os.FileInfo) string {
 			"Directory:                     %s\n"+
 			"File Size:                     %d bytes\n"+
 			"File Modification Date/Time:   %s\n"+
-			"File Access Date/Time          %s\n"+
-			"File Inode Change Date/Time    %s\n"+
-			"File Permissions               %s\n"+
+			"File Access Date/Time:         %s\n"+
+			"File Inode Change Date/Time:   %s\n"+
+			"File Permissions:              %s\n"+
 			"File Type Extension:           %s\n",
 		filepath.Base(file),
 		filepath.Dir(file),

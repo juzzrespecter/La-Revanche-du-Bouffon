@@ -29,13 +29,13 @@ func (chunk *IHDRChunk) GetMetadata() string {
 	ctv := colorTypeValues[chunk.ColorType]
 	iv := interlaceValues[chunk.InterlaceMethod]
 
-	return fmt.Sprintf("Width:                        %d\n"+
-		"Height:                       %d\n"+
-		"Bit depth:                    %d\n"+
-		"Color type:                   %s\n"+
-		"Compression method:           Inflate/Deflate\n"+
-		"Filter method:                Adaptive\n"+
-		"Interlace:                    %s\n",
+	return fmt.Sprintf("Width:                         %d\n"+
+		"Height:                        %d\n"+
+		"Bit depth:                     %d\n"+
+		"Color type:                    %s\n"+
+		"Compression method:            Inflate/Deflate\n"+
+		"Filter method:                 Adaptive\n"+
+		"Interlace:                     %s\n",
 		int32(chunk.Width),
 		int32(chunk.Height),
 		chunk.BitDepth,
