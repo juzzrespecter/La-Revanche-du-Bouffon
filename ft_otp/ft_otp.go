@@ -1,15 +1,16 @@
 package main
 
 import (
+	"encoding/base32"
 	"flag"
 	"fmt"
 	"ft_otp/internal/encrypt"
 	"ft_otp/internal/utils"
-	totp "ft_otp/pkg"
+	"ft_otp/pkg/totp"
 	"os"
 
 	"github.com/yeqown/go-qrcode/v2"
-	"github.com/yeqown/go-qrcode/writer/terminal"
+	"github.com/yeqown/go-qrcode/writer/standard"
 )
 
 type KeyArgs struct {
@@ -24,12 +25,16 @@ func generateQR(secret string) error {
 		label  string = "user"
 		issuer string = "ft_otp"
 	)
-	totpCode := fmt.Sprintf("otpauth://totp/%s/?secret=%s&issuer=%s")
+	encodedSecret := base32.StdEncoding.EncodeToString([]byte(secret))
+	totpCode := fmt.Sprintf("otpauth://totp/%s?secret=%s&issuer=%s", label, encodedSecret, issuer)
 	qrc, err := qrcode.New(totpCode)
 	if err != nil {
 		return err
 	}
-	w := terminal.New()
+	w, err := standard.New("./otp-code.jpeg")
+	if err != nil {
+		return err
+	}
 	if err := qrc.Save(w); err != nil {
 		return err
 	}
@@ -67,8 +72,22 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("Key saved succesfully in ft_otp.key")
-		if err := generateQR(keyArgs.hexKey); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		fmt.Println("Do you want to generate a QR code? (y/n)")
+		for {
+			var input string
+			_, err := fmt.Scanln(&input)
+			switch {
+			case err != nil:
+				return
+			case input == "y" || input == "yes":
+				if err := generateQR(keyArgs.hexKey); err != nil {
+					fmt.Fprintln(os.Stderr, err)
+				}
+				fmt.Println("Code succesfully generated in ./otp-code.jpeg")
+				return
+			case input == "no" || input == "n" || input == "":
+				return
+			}
 		}
 	}
 	if keyArgs.keyFile != "" {
@@ -77,6 +96,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		totp.TOTP(key)
+		code := totp.TOTP(key)
+		fmt.Printf("Code: %06s\n", code)
 	}
 }

@@ -25,19 +25,20 @@ func setMask(c uint8) []byte {
 }
 
 func xor(a []byte, b []byte) []byte {
+	K := make([]byte, B)
 	for i := range len(a) {
-		a[i] ^= b[i]
+		K[i] = a[i] ^ b[i]
 	}
-	return a
+	return K
 }
 
 func HMAC(K []byte, c []byte) []byte {
 	if len(K) > int(B) {
 		K = shaSum(K)
 	}
-	pad := B - len(K)%B
-	if pad != 0 {
-		K = append(K, make([]byte, B)...)
+	if len(K) < B {
+		pad := B - len(K)%B
+		K = append(K, make([]byte, pad)...)
 	}
 	ipad := setMask(ipadByte)
 	opad := setMask(opadByte)

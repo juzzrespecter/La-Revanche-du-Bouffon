@@ -18,6 +18,11 @@ build: $(MAIN) | $(BUILD_DIR)
 run:
 	$(RUN) $(MAIN)
 
+.PHONY: test
+test:
+	$(GO) mod tidy
+	$(GO) test -v ./...
+
 $(BUILD_DIR):
 	mkdir -pv $(BUILD_DIR)
 

@@ -14,7 +14,7 @@ var ErrMismatchKey = errors.New("")
 
 func ReadInput() ([]byte, error) {
 	rd := bufio.NewReader(os.Stdin)
-	fmt.Println("Introduce key")
+	fmt.Println("Introduce encryption key...")
 	key, err := rd.ReadBytes(byte('\n'))
 	if err != nil {
 		return nil, err

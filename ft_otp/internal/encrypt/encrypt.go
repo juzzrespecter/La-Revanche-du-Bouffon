@@ -4,27 +4,21 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
 	"ft_otp/internal/utils"
 	"os"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 func encryptKey(plaintext, key []byte) ([]byte, error) {
 	padding := aes.BlockSize - len(plaintext)%aes.BlockSize
-	ciphertext := make([]byte, len(plaintext)+padding)
-	ciphertext = append(ciphertext, make([]byte, aes.BlockSize)...)
+	ciphertext := make([]byte, len(plaintext)+padding+aes.BlockSize)
+	plaintext = append(plaintext, make([]byte, padding)...)
 
 	iv := ciphertext[:aes.BlockSize]
 	rand.Read(iv)
-
-	hash, err := bcrypt.GenerateFromPassword(key, bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("Length of hash: %d\n", len(hash))
+	hash := sha512.Sum512(key)
 	b, err := aes.NewCipher(hash[:32])
 	if err != nil {
 		return nil, err
@@ -36,10 +30,7 @@ func encryptKey(plaintext, key []byte) ([]byte, error) {
 }
 
 func decryptKey(ciphertext, key []byte) ([]byte, error) {
-	hash, err := bcrypt.GenerateFromPassword(key, bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
+	hash := sha512.Sum512(key)
 	b, err := aes.NewCipher(hash[:32])
 	if err != nil {
 		return nil, err
@@ -60,8 +51,8 @@ func EncryptKey(key string) error {
 	if len(key) < 64 {
 		return utils.ErrKeyLength
 	}
-	if _, err := hex.DecodeString(key); err != nil {
-		fmt.Println(err)
+	dec, err := hex.DecodeString(key)
+	if err != nil {
 		return utils.ErrKeyEncode
 	}
 	fd, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -73,7 +64,7 @@ func EncryptKey(key string) error {
 	if err != nil {
 		return fmt.Errorf("Encrypt Key: %w", err)
 	}
-	encryptedKey, err := encryptKey([]byte(key), passwd)
+	encryptedKey, err := encryptKey(dec, passwd)
 	if err != nil {
 		return fmt.Errorf("Encrypt Key: %w", err)
 	}
