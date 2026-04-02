@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"scorpion/pkg/bmp"
-	"scorpion/pkg/gif"
 	"scorpion/pkg/jpeg"
 	"scorpion/pkg/png"
 	"slices"
@@ -100,12 +99,15 @@ func main() {
 				}
 				imgInfo = bmpInfo
 			case ".gif":
-				gifInfo, err := gif.Gif(f)
-				if err != nil {
-					errs <- fmt.Errorf("%s: %s", file, err)
+				magic := make([]byte, 6)
+				f.Read(magic)
+				switch string(magic) {
+				case "GIF87a", "GIF89a":
+					imgInfo = ""
+				default:
+					errs <- fmt.Errorf("%s: not a .gif file")
 					return
 				}
-				imgInfo = gifInfo
 			default:
 				errs <- fmt.Errorf("%s: won't do", file)
 				return

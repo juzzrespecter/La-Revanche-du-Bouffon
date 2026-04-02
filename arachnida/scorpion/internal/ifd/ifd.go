@@ -66,9 +66,8 @@ func (ifd *IFDEntry) FormatIFD(base []byte, order binary.ByteOrder) string {
 	case 7: // undefined
 		switch ifd.Tag {
 		case 0x927c: // MakerNote, unprintable
-			break
+			valueString = []string{"[ binary blob ]"}
 		case 0x9000, 0xA000:
-			fmt.Print("Tags fancy: ")
 			valueString = append(valueString, string(valueArr[0]))
 		case 0x9101:
 			for _, x := range valueArr {
@@ -114,8 +113,6 @@ func (ifd *IFDEntry) FormatIFD(base []byte, order binary.ByteOrder) string {
 				}
 			}
 		}
-
-		valueString = append(valueString, "[UNDEF]") // borrame
 	case 10: // signed rational
 		for _, x := range valueArr {
 			n := float64(int32(order.Uint32(x[:4])))
