@@ -36,13 +36,11 @@ var retriableCodes = []int{
 }
 
 func backoff(retryAttempt int) time.Duration {
-	base := 2000 * time.Millisecond
+	base := 3000 * time.Millisecond
 	max := 10 * time.Second
 
 	x := time.Duration(1<<retryAttempt) * base
-	if x > max {
-		x = max
-	}
+	x = min(x, max)
 	y := int64(x / 2)
 	return time.Duration(rand.Int63n(int64(x)-y) + y)
 }
@@ -82,6 +80,14 @@ func (c *CustomClient) AlreadyVisited(url string) bool {
 	return status
 }
 
+func (c *CustomClient) freeSem() {
+	select {
+	case <-c.reqSem:
+	default:
+		return
+	}
+}
+
 /*
 Criterios para retry:
 
@@ -106,35 +112,42 @@ func (c *CustomClient) Get(url string) (*http.Response, context.CancelFunc, erro
 	if err != nil {
 		return nil, cancel, err
 	}
-	req.Header.Set("User-Agent", utils.GetUserAgent())
-	for retry := 1; retry < c.maxRetries; retry++ {
-		if retry > 1 {
-			req = req.Clone(req.Context())
-		}
-		select {
-		case c.reqSem <- struct{}{}:
+	defer func() {
+		c.freeSem()
+	}()
+	select {
+	case c.reqSem <- struct{}{}:
+		for retry := 0; retry < c.maxRetries; retry++ {
+			if retry > 0 {
+				req = req.Clone(req.Context())
+			}
+			req.Header.Set("User-Agent", utils.GetUserAgent())
+			logger.Info("Trying for " + url + " ...")
 			res, err := c.client.Do(req)
-			<-c.reqSem
 			switch {
 			case err != nil:
-				return nil, cancel, err
+				return nil, cancel, fmt.Errorf("%s: %s", url, err)
 			case slices.Contains(retriableCodes, res.StatusCode):
-				logger.Warning(fmt.Sprintf("Retrying for %s (status: %d) (attempt %d)...\n", url, res.StatusCode, retry))
-				retryTime := backoff(retry)
+				if req.Body != nil {
+					req.Body.Close()
+				}
 				select {
-				case <-time.After(retryTime):
-					logger.Warning(fmt.Sprintf("Retrying for %s (attempt %d)...\n", url, retry))
+				case <-time.After(backoff(retry)):
+					logger.Warning(fmt.Sprintf("Retrying for %s (status: %d) (attempt %d)...\n", url, res.StatusCode, retry+1))
 				case <-ctx.Done():
-					return nil, cancel, ctx.Err()
+					return nil, cancel, fmt.Errorf("%s: %s", url, err)
 				}
 			case res.StatusCode == http.StatusOK:
+				if retry > 0 {
+					fmt.Println("ueeeeeevamoo")
+				}
 				return res, cancel, nil
 			default:
-				return nil, cancel, fmt.Errorf("Request to %s %d", url, res.StatusCode)
+				return nil, cancel, fmt.Errorf("Request to %s failed with %d", url, res.StatusCode)
 			}
-		case <-ctx.Done():
-			return nil, cancel, ctx.Err()
 		}
+	case <-ctx.Done():
+		return nil, cancel, ctx.Err()
 	}
 	return nil, cancel, fmt.Errorf("%s: max number of retries exceeded", url)
 }

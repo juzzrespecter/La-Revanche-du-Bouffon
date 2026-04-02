@@ -16,7 +16,7 @@ type ParseResult struct {
 	Src  []string
 }
 
-var validTypes = []string{".jpg", ".jpeg", ".png", ".bmp"}
+var validTypes = []string{".jpg", ".jpeg", ".png", ".bmp", ".gif"}
 
 func (r ParseResult) Unpack() ([]string, []string) {
 	return r.Href, r.Src

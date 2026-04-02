@@ -2,10 +2,12 @@ package ifd
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 )
 
 type IFDEntry struct {
@@ -41,9 +43,6 @@ func (ifd *IFDEntry) FormatIFD(base []byte, order binary.ByteOrder) string {
 	for i := uint32(0); i < ifd.N; i++ {
 		valueArr = append(valueArr, value[i*e:i*e+e])
 	}
-	//fmt.Printf("IFDEntry getValues: \nNumber of values: %d\nValue array: %v (length: %d)\nArray of values (offset): %v\nActual size of value: %d\n\n",
-	//	ifd.N, value, len(value), valueArr, size,
-	//)
 	var valueString []string
 	switch ifd.Fmt {
 	case 1, 3, 4: // unsigned numbers
@@ -60,16 +59,67 @@ func (ifd *IFDEntry) FormatIFD(base []byte, order binary.ByteOrder) string {
 		valueString = append(valueString, string(value))
 	case 5: // unsigned rational
 		for _, x := range valueArr {
-			n := float64(order.Uint16(x[:4]))
-			d := float64(order.Uint16(x[4:]))
+			n := float64(order.Uint32(x[:4]))
+			d := float64(order.Uint32(x[4:]))
 			valueString = append(valueString, strconv.FormatFloat(n/d, 'f', -1, 64))
 		}
-	case 7:
-		valueString = append(valueString, "undef.")
+	case 7: // undefined
+		switch ifd.Tag {
+		case 0x927c: // MakerNote, unprintable
+			break
+		case 0x9000, 0xA000:
+			fmt.Print("Tags fancy: ")
+			valueString = append(valueString, string(valueArr[0]))
+		case 0x9101:
+			for _, x := range valueArr {
+				valueString = append(valueString, fmt.Sprintf("%v", x))
+			}
+		case 0x9286:
+			comment := []byte{}
+			for _, x := range valueArr {
+				comment = append(comment, x...)
+			}
+			if len(comment) > 8 {
+				prefix := comment[:8]
+				content := comment[8:]
+				switch string(prefix) {
+				case "ASCII\x00\x00\x00":
+					valueString = append(valueString, string(content))
+				case "UNICODE\x00":
+					unicode16 := make([]uint16, len(comment)/2)
+					for i := range len(comment) / 2 {
+						order.PutUint16(content[i*2:i*2+2], unicode16[i])
+					}
+					valueString = append(valueString, string(utf16.Decode(unicode16)))
+				default:
+					valueString = append(valueString, hex.EncodeToString(comment))
+				}
+			} else {
+				valueString = []string{""}
+			}
+		default:
+			for _, x := range valueArr {
+				isPrintable := func(n []byte) bool {
+					for _, c := range n {
+						if c > 126 || c < 32 {
+							return false
+						}
+					}
+					return true
+				}
+				if isPrintable(x) {
+					valueString = append(valueString, string(x))
+				} else {
+					valueString = append(valueString, hex.EncodeToString(x))
+				}
+			}
+		}
+
+		valueString = append(valueString, "[UNDEF]") // borrame
 	case 10: // signed rational
 		for _, x := range valueArr {
-			n := float64(int16(order.Uint16(x[:4])))
-			d := float64(int16(order.Uint16(x[4:])))
+			n := float64(int32(order.Uint32(x[:4])))
+			d := float64(int32(order.Uint32(x[4:])))
 
 			valueString = append(valueString, strconv.FormatFloat(n/d, 'f', -1, 64))
 		}
@@ -81,6 +131,5 @@ func (ifd *IFDEntry) FormatIFD(base []byte, order binary.ByteOrder) string {
 		}
 
 	}
-
 	return fmt.Sprintf("%-*s%s\n", 31, IFDTags[ifd.Tag]+":", strings.Join(valueString, ","))
 }

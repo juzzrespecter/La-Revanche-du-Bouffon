@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"scorpion/pkg/bmp"
+	"scorpion/pkg/gif"
 	"scorpion/pkg/jpeg"
 	"scorpion/pkg/png"
 	"slices"
@@ -15,7 +16,7 @@ import (
 )
 
 var validExts = []string{
-	".jpg", ".jpeg", ".png", ".bmp",
+	".jpg", ".jpeg", ".png", ".bmp", ".gif",
 }
 
 func Usage() {
@@ -98,6 +99,13 @@ func main() {
 					return
 				}
 				imgInfo = bmpInfo
+			case ".gif":
+				gifInfo, err := gif.Gif(f)
+				if err != nil {
+					errs <- fmt.Errorf("%s: %s", file, err)
+					return
+				}
+				imgInfo = gifInfo
 			default:
 				errs <- fmt.Errorf("%s: won't do", file)
 				return

@@ -8,6 +8,7 @@ import (
 	"os"
 	"spider/internal/logger"
 	"spider/pkg/crawler"
+	"strings"
 	"time"
 )
 
@@ -58,21 +59,29 @@ func init() {
 	URL = url
 }
 
-func checkDirectory(storage string) error {
+func checkDirectory(storage string) (string, error) {
+	if !strings.HasSuffix(storage, "/") {
+		storage += "/"
+	}
 	f, err := os.Stat(storage)
 	if err != nil {
-		return err
+		if err := os.MkdirAll(storage, 0755); err != nil {
+			return "", err
+		}
+		return storage, nil
 	}
 	switch mode := f.Mode(); {
 	case mode.IsDir():
-		return nil
+		return storage, nil
 	default:
-		return fmt.Errorf("%s: not a directory", storage)
+		return "", fmt.Errorf("%s: not a directory", storage)
 	}
+
 }
 
 func main() {
-	if err := checkDirectory(p); err != nil {
+	storage, err := checkDirectory(p)
+	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
@@ -81,9 +90,9 @@ func main() {
 		Ctx:         ctx,
 		IsRecursive: r,
 		Depth:       uint(l),
-		StoreDir:    p,
+		StoreDir:    storage,
 
-		Timeout:               15 * time.Second,
+		Timeout:               45 * time.Second,
 		MaxConcurrentRequests: 15,
 	}
 	crawler.Crawl(*URL, cfg)

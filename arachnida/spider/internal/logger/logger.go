@@ -7,6 +7,7 @@ import (
 
 const (
 	DEBUG   string = "\033[1;35m"
+	SUCCESS string = "\033[1;32m"
 	INFO    string = "\033[1;34m"
 	WARNING string = "\033[1;33m"
 	ERROR   string = "\033[0;31m"
@@ -15,6 +16,10 @@ const (
 
 func Debug(msg string) {
 	fmt.Fprintf(os.Stderr, "%s [DEBUG]   %s %s\n", DEBUG, RESET, msg)
+}
+
+func Success(msg string) {
+	fmt.Fprintf(os.Stderr, "%s [SUCCESS] %s %s\n", SUCCESS, RESET, msg)
 }
 
 func Info(msg string) {
