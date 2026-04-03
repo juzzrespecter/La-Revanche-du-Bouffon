@@ -22,9 +22,6 @@ services:
       - onion_sockets:/var/run/tor/sockets/
     depends_on:
       - nginx
-    networks:
-      - tor
     
 volumes:
-  nginx_socket:
-  ssh_socket:
+  onion_sockets:

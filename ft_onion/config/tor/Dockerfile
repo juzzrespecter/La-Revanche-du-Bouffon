@@ -1,4 +1,4 @@
-ARG DISTRO=bullseye
+ARG DISTRO=trixie
 FROM debian:$DISTRO-slim
 
 ARG DISTRO
@@ -30,8 +30,8 @@ RUN wget -qO- https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512
     gpg --dearmor |\
     tee /usr/share/keyrings/deb.torproject.org-keyring.gpg >/dev/null
 RUN apt update && \
-    apt install tor deb.torproject.org-keyring
+    apt install tor deb.torproject.org-keyring -y
 
-COPY ./config/tor/docker-entrypoint.sh /
+COPY ./config/tor/docker-entrypoint.sh /docker-entrypoint.sh
 
-CMD ["/docker-entrypoint.sh"]
+CMD ["tor"]

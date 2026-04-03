@@ -1,4 +1,5 @@
 #!/bin/bash
+
 SSH_UNIX_SOCKET=/var/run/tor/sockets/onion-ssh.sock
 
 if ! [ -f "$SSH_UNIX_SOCKET" ]; then
