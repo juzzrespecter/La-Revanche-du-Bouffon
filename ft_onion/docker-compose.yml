@@ -1,0 +1,27 @@
+services:
+  nginx:
+    container_name: nginx
+    build:
+      context: .
+      dockerfile: ./config/nginx/Dockerfile
+    image: nginx:1.29.7
+    restart: on-failure
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/index.html:/var/www/html/index.html:ro
+      - onion_sockets:/var/run/tor/sockets/
+    network_mode: none
+
+  tor:
+    container_name: tor-service
+    build:
+      context: .
+      dockerfile: ./config/tor/Dockerfile
+    volumes:
+      - ./config/tor/torrc:/etc/tor/torrc:ro
+      - onion_sockets:/var/run/tor/sockets/
+    depends_on:
+      - nginx
+    
+volumes:
+  onion_sockets:

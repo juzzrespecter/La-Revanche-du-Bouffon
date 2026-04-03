@@ -1,0 +1,7 @@
+# nginx hidden service
+HiddenServiceDir /var/lib/tor/onion-nginx/
+HiddenServicePort 80 unix:/var/run/tor/onion-nginx.sock
+
+# ssh hidden service
+HiddenServiceDir /var/lib/tor/onion-ssh/
+HiddenServicePort 4242 unix:/var/run/tor/onion-ssh.sock
